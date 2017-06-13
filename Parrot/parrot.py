@@ -148,7 +148,7 @@ class Parrot:
             self.save_file["Servers"][server.id] = copy.deepcopy(server_default)
             self.save_file["Servers"][server.id]["Parrot"]["Appetite"] = round(random.normalvariate(50, 6))    
             dataIO.save_json(save_filepath, self.save_file)
-            print("New server found and added to Parrot database!")
+            print("New server \"" + server.name + "\" found and added to Parrot database!")
         
         return
 
