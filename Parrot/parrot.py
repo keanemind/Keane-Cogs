@@ -119,15 +119,9 @@ class Parrot:
                 #don't check on day 0 to give new servers a chance... see if the server has starved Parrot (he's less than halfway fed)
                 if (self.save_file["Servers"][serverid]["Parrot"]["DaysAlive"] != 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
                     #die to starvation
-                    for server in self.bot.servers:
-                        if server.id == serverid:
-                            await self.bot.send_message(server, "Oh no! I've starved to death!\nGoodbye, cruel world!")
-
-                            #leave the server
-                            await self.bot.leave_server(server) #disable when testing
-
-                            break
-
+                    await self.bot.send_message(self.bot.get_server(serverid), "Oh no! I've starved to death!\nGoodbye, cruel world!")
+                    await self.bot.leave_server(self.bot.get_server(serverid)) #leave the server. disable when testing
+                    
                     #delete server from database
                     del self.save_file["Servers"][serverid]
 
