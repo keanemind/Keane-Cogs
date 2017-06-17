@@ -113,7 +113,7 @@ class Parrot:
         #check if starved, and leave if starved, saving certain data and deleting others
         #otherwise reset settings except permanent ones, generate new appetite
         while True:
-            await asyncio.sleep(86400) #24 hours is 86400s            
+            await asyncio.sleep(86400) #24 hours is 86400 seconds            
             for serverid in list(self.save_file["Servers"]): #wont run when the database is empty
 
                 #don't check on day 0 to give new servers a chance... see if the server has starved Parrot (he's less than halfway fed)
@@ -121,10 +121,10 @@ class Parrot:
                     #die to starvation
                     for server in self.bot.servers:
                         if server.id == serverid:
-                            await self.bot.send_message(server, "I starved to death!")
+                            await self.bot.send_message(server, "Oh no! I've starved to death!\nGoodbye, cruel world!")
 
                             #leave the server
-                            #await self.bot.leave_server(server) #DISABLED FOR TESTING
+                            await self.bot.leave_server(server) #disable when testing
 
                             break
 
