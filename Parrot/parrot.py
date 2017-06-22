@@ -120,7 +120,7 @@ class Parrot:
         while True:
             await asyncio.sleep(86400 - ((time.time() - start_time) % 86400)) #sleep for what's left of the time (approx. 80%)
             for serverid in self.save_file["Servers"]:
-                if self.save_file["Servers"][serverid]["Parrot"]["DaysAlive"] != 0:
+                if (self.save_file["Servers"][serverid]["Parrot"]["DaysAlive"] != 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
                     await self.bot.send_message(self.bot.get_server(serverid), "I'm going to die of starvation soon...")
 
             await asyncio.sleep(86400 * 0.2) #sleep for 20% of the time... since this is in a separate thread, so users can feed during this sleep
