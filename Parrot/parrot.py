@@ -81,11 +81,11 @@ class Parrot:
     #also plan the Parrot With function
 
     @commands.group(pass_context=True, no_pm=True)
-    async def parrot(self, ctx): #need a fix in here
+    async def parrot(self, ctx): 
         """Parrot needs to be fed! Every day, Parrot has a different appetite value, which is how many food pellets he would like to be fed for the day. Spend your credits to feed Parrot pellets using the !feed command, and find out how full Parrot is or what his appetite is by using the !parrot info command."""
 
         if ctx.invoked_subcommand is None:
-            await send_cmd_help(ctx) #broken for some odd reason wtf
+            await send_cmd_help(ctx) 
 
     @parrot.command(name="info", pass_context=True)
     async def parrotinfo(self, ctx):
@@ -111,9 +111,10 @@ class Parrot:
             return await self.bot.say("Cost must be at least 0")
 
     async def daily_check(self): 
-        #check if starved, and leave if starved, saving certain data and deleting others
-        #otherwise reset settings except permanent ones, generate new appetite
+        #check if starved. if starved, leave and wipe data
+        #otherwise, reset settings except permanent ones (generate new appetite)
         #servers that use a Parrot command for the first time get added to the database and still follow the starvecheck schedule below
+        #make sure Parrot is loaded at the time you want the starvation check to be every day
 
         start_time = time.time() - (86400 * 0.2) #24 hours is 86400 seconds 
         while True:
@@ -156,7 +157,6 @@ class Parrot:
 
     def __unload(self):
         self.loop_task.cancel()
-        #save data here?
 
 def dir_check():
     if not os.path.exists("data/KeaneCogs/parrot"):
