@@ -2,6 +2,7 @@ import os
 import random
 import asyncio
 import copy
+import time
 
 import discord
 from .utils import checks
@@ -21,7 +22,7 @@ server_default = {"Parrot":{"Appetite":0,
 save_filepath = "data/KeaneCogs/parrot/parrot.json"
 
 class Parrot:
-    """learning stuff"""
+    """Commands related to feeding the bot"""
     def __init__(self, bot): 
         self.save_file = dataIO.load_json(save_filepath)
         self.bot = bot
@@ -75,7 +76,7 @@ class Parrot:
         self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Fullness"] += amount
 
         dataIO.save_json(save_filepath, self.save_file)
-        return await self.bot.say("You spent " + str(usercost) + " credits to feed Parrot " + str(amount) + " pellets.") #remove this after making confirmation prompt
+        return await self.bot.say("Om nom nom. Thanks!")
         
     #also plan the Parrot With function
 
@@ -112,11 +113,18 @@ class Parrot:
     async def daily_check(self): 
         #check if starved, and leave if starved, saving certain data and deleting others
         #otherwise reset settings except permanent ones, generate new appetite
-        while True:
-            await asyncio.sleep(86400) #24 hours is 86400 seconds            
-            for serverid in list(self.save_file["Servers"]): #wont run when the database is empty
+        #servers that use a Parrot command for the first time get added to the database and still follow the starvecheck schedule below
 
-                #don't check on day 0 to give new servers a chance... see if the server has starved Parrot (he's less than halfway fed)
+        start_time = time.time() - (86400 * 0.2) #24 hours is 86400 seconds 
+        while True:
+            await asyncio.sleep(86400 - ((time.time() - start_time) % 86400)) #sleep for what's left of the time (approx. 80%)
+            for serverid in self.save_file["Servers"]:
+                if self.save_file["Servers"][serverid]["Parrot"]["DaysAlive"] != 0:
+                    await self.bot.send_message(self.bot.get_server(serverid), "I'm going to die of starvation soon...")
+
+            await asyncio.sleep(86400 * 0.2) #sleep for 20% of the time... since this is in a separate thread, so users can feed during this sleep
+            for serverid in list(self.save_file["Servers"]): 
+                #don't check on day 0 to give new servers a chance, and see if the server has starved Parrot (if he's less than halfway fed)
                 if (self.save_file["Servers"][serverid]["Parrot"]["DaysAlive"] != 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
                     #die to starvation
                     await self.bot.send_message(self.bot.get_server(serverid), "Oh no! I've starved to death!\nGoodbye, cruel world!")
