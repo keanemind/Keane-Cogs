@@ -32,7 +32,7 @@ class Parrot:
 
         self.starve_time = copy.deepcopy(self.save_file["Global"]["StarveTime"]) #the current running starve_time is set only when the cog is first loaded. reset the cog to apply a change to StarveTime
 
-        self.loop_task = bot.loop.create_task(self.daily_check()) #remember to also change the unload function
+        self.loop_task = bot.loop.create_task(self.starve_check()) #remember to also change the unload function
 
     @commands.command(pass_context = True, no_pm = True)
     async def feed(self, ctx, amount: int):
@@ -109,8 +109,8 @@ class Parrot:
         else:
             time_until_starved = "Time until starved: " + str(datetime.timedelta(seconds = round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
         # say you're checking every 60 seconds instead of self.starve_time seconds
-        # (Parrot.start_time + (60 * 0.2)) is the actual start time of daily_check
-        # (time.time() - actual_start_time) is how long it's been (in seconds) since daily_check started
+        # (Parrot.start_time + (60 * 0.2)) is the actual start time of starve_check
+        # (time.time() - actual_start_time) is how long it's been (in seconds) since starve_check started
         # (time_since_started % 60) resets to 0 every time it hits a multiple of 60
         # (60 - time_since_started_capped_at_60) is how long is left until the check runs again
         # if Parrot has been alive 0 days, (60*2 - time_since_started_capped_at_60) is how long is left until he will starve
@@ -144,12 +144,12 @@ class Parrot:
 
         if seconds > 0:
             self.save_file["Global"]["StarveTime"] = seconds
-            dataIO.save_json(save_filepath, self.save_file) #IMPORTANT this does not affect the daily_check function until the cog is reloaded. see __init__
+            dataIO.save_json(save_filepath, self.save_file) #IMPORTANT this does not affect the starve_check function until the cog is reloaded. see __init__
             return await self.bot.say("Set period between starvation checks to " + str(seconds) + " seconds. This setting will not go into effect until the cog is reloaded.")
         else:
             return await self.bot.say("Must be at least 1 second.")
 
-    async def daily_check(self): 
+    async def starve_check(self): 
         #check if starved. if starved, leave and wipe data
         #otherwise, reset settings except permanent ones (generate new appetite)
         #servers that use a Parrot command for the first time get added to the database and still follow the starvecheck schedule below
