@@ -12,7 +12,7 @@ from discord.ext import commands
 from __main__ import send_cmd_help
 
 server_default = {"Parrot":{"Appetite":0, 
-                            "DaysAlive":0,
+                            "LoopsAlive":0,
                             "UserWith":"", 
                             "Fullness":0, 
                             "Cost":5
@@ -25,9 +25,12 @@ save_filepath = "data/KeaneCogs/parrot/parrot.json"
 class Parrot:
     """Commands related to feeding the bot"""
     start_time = 0.0
+
     def __init__(self, bot): 
         self.save_file = dataIO.load_json(save_filepath)
         self.bot = bot
+
+        self.starve_time = copy.deepcopy(self.save_file["Global"]["StarveTime"]) #the current running starve_time is set only when the cog is first loaded. reset the cog to apply a change to StarveTime
 
         self.loop_task = bot.loop.create_task(self.daily_check()) #remember to also change the unload function
 
@@ -57,7 +60,7 @@ class Parrot:
         usercost = amount * self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Cost"]
 
         #confirmation prompt
-        await self.bot.say("You are about to spend " + str(usercost) + " credits to feed Parrot " + str(amount) + " pellets. Reply with yes to confirm.")
+        await self.bot.say("You are about to spend " + str(usercost) + " credits to feed Parrot " + str(amount) + " pellets. Reply \"yes\" to confirm.")
         response = await self.bot.wait_for_message(author = ctx.message.author)
         if response.content.lower().strip() != "yes":
             return await self.bot.say("Okay then, but don't let Parrot starve!")
@@ -97,15 +100,15 @@ class Parrot:
 
         fullness = "Fullness: " + str(self.save_file["Servers"][server.id]["Parrot"]["Fullness"]) + " out of " + str(self.save_file["Servers"][server.id]["Parrot"]["Appetite"])
         feed_cost = "Cost to feed: " + str(self.save_file["Servers"][server.id]["Parrot"]["Cost"])
-        days_living = "Days living (age): " + str(self.save_file["Servers"][server.id]["Parrot"]["DaysAlive"])
+        days_living = "Days living (age): " + str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400) 
         
         if (self.save_file["Servers"][server.id]["Parrot"]["Fullness"] / self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) >= 0.5:
             time_until_starved = "Time until starved: Parrot has been fed enough food that he won't starve today!"
-        elif self.save_file["Servers"][server.id]["Parrot"]["DaysAlive"] == 0:
-            time_until_starved = "Time until starved: " + str(datetime.timedelta(seconds = round((86400*2) - ((time.time() - (Parrot.start_time + (86400 * 0.2))) % 86400))))
+        elif self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] == 0:
+            time_until_starved = "Time until starved: " + str(datetime.timedelta(seconds = round((self.starve_time * 2) - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
         else:
-            time_until_starved = "Time until starved: " + str(datetime.timedelta(seconds = round(86400 - ((time.time() - (Parrot.start_time + (86400 * 0.2))) % 86400))))
-        # say you're checking every 60 seconds instead of 86400 seconds
+            time_until_starved = "Time until starved: " + str(datetime.timedelta(seconds = round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
+        # say you're checking every 60 seconds instead of self.starve_time seconds
         # (Parrot.start_time + (60 * 0.2)) is the actual start time of daily_check
         # (time.time() - actual_start_time) is how long it's been (in seconds) since daily_check started
         # (time_since_started % 60) resets to 0 every time it hits a multiple of 60
@@ -113,38 +116,57 @@ class Parrot:
         # if Parrot has been alive 0 days, (60*2 - time_since_started_capped_at_60) is how long is left until he will starve
         # datetime.timedelta formats this number of seconds into 0:00:00 
 
-        await self.bot.say(fullness + "\n" + feed_cost + "\n" + days_living + "\n" + time_until_starved) #+ "\n" + eventually show who he's currently with
+        return await self.bot.say(fullness + "\n" + feed_cost + "\n" + days_living + "\n" + time_until_starved) #+ "\n" + eventually show who he's currently with
 
     @parrot.command(name="setcost", pass_context=True)
     @checks.admin_or_permissions(manage_server=True) #only admins can use this command
-    async def parrotsetcost(self, ctx, cost: int):
+    async def parrot_set_cost(self, ctx, cost: int):
         """Change how much it costs to feed the parrot 1 pellet"""
         server = ctx.message.server
         self.add_server(server) #make sure the server is in the database
         if cost >= 0:
             self.save_file["Servers"][server.id]["Parrot"]["Cost"] = cost
             dataIO.save_json(save_filepath, self.save_file)
-            return await self.bot.say("Set cost of feeding to " + str(cost))
+            return await self.bot.say("Set cost of feeding to " + str(cost) + " credits per pellet.")
         else:
-            return await self.bot.say("Cost must be at least 0")
+            return await self.bot.say("Cost must be at least 0.")
+
+    @parrot.command(name="setstarvetime", pass_context=True, no_pm=False)
+    @checks.is_owner() #only the bot OWNER can use this command
+    async def parrot_set_starve_time(self, ctx, seconds: int):
+        """Change how long (in seconds) server members have to feed Parrot before he starves"""
+
+        #confirmation prompt
+        await self.bot.say("This is a global setting that affects all servers the bot is connected to. Parrot periodically checks whether he has starved or not. Are you sure you want Parrot to wait " + str(seconds) + " SECONDS between checks? Reply \"yes\" to confirm.")
+        response = await self.bot.wait_for_message(author = ctx.message.author)
+        if response.content.lower().strip() != "yes":
+            return await self.bot.say("Setting change cancelled.")
+
+        if seconds > 0:
+            self.save_file["Global"]["StarveTime"] = seconds
+            dataIO.save_json(save_filepath, self.save_file) #IMPORTANT this does not affect the daily_check function until the cog is reloaded. see __init__
+            return await self.bot.say("Set period between starvation checks to " + str(seconds) + " seconds. This setting will not go into effect until the cog is reloaded.")
+        else:
+            return await self.bot.say("Must be at least 1 second.")
 
     async def daily_check(self): 
         #check if starved. if starved, leave and wipe data
         #otherwise, reset settings except permanent ones (generate new appetite)
         #servers that use a Parrot command for the first time get added to the database and still follow the starvecheck schedule below
-        #make sure Parrot is loaded at the time you want the starvation check to be every day
 
-        Parrot.start_time = time.time() - (86400 * 0.2) #24 hours is 86400 seconds 
+        #IMPORTANT: make sure Parrot is loaded at the time you want the starvation check to be every day
+
+        Parrot.start_time = time.time() - (self.starve_time * 0.2) 
         while True:
-            await asyncio.sleep(86400 - ((time.time() - Parrot.start_time) % 86400)) #sleep for what's left of the time (approx. 80%)
+            await asyncio.sleep(self.starve_time - ((time.time() - Parrot.start_time) % self.starve_time)) #sleep for what's left of the time (approx. 80% of self.starve_time)
             for serverid in self.save_file["Servers"]:
-                if (self.save_file["Servers"][serverid]["Parrot"]["DaysAlive"] != 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
+                if (self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] > 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
                     await self.bot.send_message(self.bot.get_server(serverid), "I'm going to die of starvation soon...")
 
-            await asyncio.sleep(86400 * 0.2) #sleep for 20% of the time... since this is in a separate thread, so users can feed during this sleep
+            await asyncio.sleep(self.starve_time * 0.2) #sleep for 20% of the time... since this is in a separate thread, so users can feed during this sleep
             for serverid in list(self.save_file["Servers"]): 
                 #don't check on day 0 to give new servers a chance, and see if the server has starved Parrot (if he's less than halfway fed)
-                if (self.save_file["Servers"][serverid]["Parrot"]["DaysAlive"] != 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
+                if (self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] > 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
                     #die to starvation
                     await self.bot.send_message(self.bot.get_server(serverid), "Oh no! I've starved to death!\nGoodbye, cruel world!")
                     await self.bot.leave_server(self.bot.get_server(serverid)) #leave the server. disable when testing
@@ -160,7 +182,7 @@ class Parrot:
                     self.save_file["Servers"][serverid]["Feeders"].clear() #https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
 
             for serverid in self.save_file["Servers"]:
-                self.save_file["Servers"][serverid]["Parrot"]["DaysAlive"] += 1
+                self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] += 1
 
             dataIO.save_json(save_filepath, self.save_file)
     
@@ -183,7 +205,7 @@ def dir_check():
 
     if not dataIO.is_valid_json(save_filepath):
         print("Creating default parrot.json...")
-        dataIO.save_json(save_filepath, {"Servers": {}})
+        dataIO.save_json(save_filepath, {"Servers": {}, "Global": {"StarveTime": 86400}})
 
 def setup(bot): 
     dir_check()
