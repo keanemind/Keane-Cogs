@@ -6,12 +6,12 @@ import time
 import datetime
 
 import discord
-from .utils import checks
-from .utils.dataIO import dataIO
 from discord.ext import commands
 from __main__ import send_cmd_help
+from .utils import checks
+from .utils.dataIO import dataIO
 
-server_default = {"Parrot":{"Appetite":0,
+SERVER_DEFAULT = {"Parrot":{"Appetite":0,
                             "LoopsAlive":0,
                             "UserWith":"",
                             "Fullness":0,
@@ -20,14 +20,14 @@ server_default = {"Parrot":{"Appetite":0,
                   "Feeders":{}
                  }
 
-save_filepath = "data/KeaneCogs/parrot/parrot.json"
+SAVE_FILEPATH = "data/KeaneCogs/parrot/parrot.json"
 
 class Parrot:
     """Commands related to feeding the bot"""
     start_time = 0.0
 
     def __init__(self, bot):
-        self.save_file = dataIO.load_json(save_filepath)
+        self.save_file = dataIO.load_json(SAVE_FILEPATH)
         self.bot = bot
 
         self.starve_time = copy.deepcopy(self.save_file["Global"]["StarveTime"])
@@ -84,7 +84,7 @@ class Parrot:
         # change parrot's fullness level
         self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Fullness"] += amount
 
-        dataIO.save_json(save_filepath, self.save_file)
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
         return await self.bot.say("Om nom nom. Thanks!")
 
     @commands.group(pass_context=True, no_pm=True)
@@ -128,7 +128,7 @@ class Parrot:
         self.add_server(server) # make sure the server is in the database
         if cost >= 0:
             self.save_file["Servers"][server.id]["Parrot"]["Cost"] = cost
-            dataIO.save_json(save_filepath, self.save_file)
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
             return await self.bot.say("Set cost of feeding to " + str(cost) + " credits per pellet.")
         else:
             return await self.bot.say("Cost must be at least 0.")
@@ -146,7 +146,7 @@ class Parrot:
 
         if seconds > 0:
             self.save_file["Global"]["StarveTime"] = seconds
-            dataIO.save_json(save_filepath, self.save_file) # IMPORTANT this does not affect the starve_check function until the cog is reloaded. see __init__
+            dataIO.save_json(SAVE_FILEPATH, self.save_file) # IMPORTANT this does not affect the starve_check function until the cog is reloaded. see __init__
             return await self.bot.say("Set period between starvation checks to " + str(seconds) + " seconds. This setting will not go into effect until the cog is reloaded.")
         else:
             return await self.bot.say("Must be at least 1 second.")
@@ -187,14 +187,14 @@ class Parrot:
             for serverid in self.save_file["Servers"]:
                 self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] += 1
 
-            dataIO.save_json(save_filepath, self.save_file)
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     def add_server(self, server):
         """Adds the server to the file if it isn't already in it"""
         if server.id not in self.save_file["Servers"]:
-            self.save_file["Servers"][server.id] = copy.deepcopy(server_default)
+            self.save_file["Servers"][server.id] = copy.deepcopy(SERVER_DEFAULT)
             self.save_file["Servers"][server.id]["Parrot"]["Appetite"] = round(random.normalvariate(50, 6))
-            dataIO.save_json(save_filepath, self.save_file)
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
             print("New server \"" + server.name + "\" found and added to Parrot database!")
 
         return
@@ -208,9 +208,9 @@ def dir_check():
         print("Creating data/KeaneCogs/parrot folder...")
         os.makedirs("data/KeaneCogs/parrot")
 
-    if not dataIO.is_valid_json(save_filepath):
+    if not dataIO.is_valid_json(SAVE_FILEPATH):
         print("Creating default parrot.json...")
-        dataIO.save_json(save_filepath, {"Servers": {}, "Global": {"StarveTime": 86400}})
+        dataIO.save_json(SAVE_FILEPATH, {"Servers": {}, "Global": {"StarveTime": 86400}})
 
 def setup(bot):
     dir_check()
