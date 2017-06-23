@@ -3,6 +3,7 @@ import random
 import asyncio
 import copy
 import time
+import datetime
 
 import discord
 from .utils import checks
@@ -23,6 +24,7 @@ save_filepath = "data/KeaneCogs/parrot/parrot.json"
 
 class Parrot:
     """Commands related to feeding the bot"""
+    start_time = 0.0
     def __init__(self, bot): 
         self.save_file = dataIO.load_json(save_filepath)
         self.bot = bot
@@ -93,9 +95,25 @@ class Parrot:
         server = ctx.message.server
         self.add_server(server) #make sure the server is in the database
 
-        await self.bot.say("Fullness: " + str(self.save_file["Servers"][server.id]["Parrot"]["Fullness"]) + " out of " + str(self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) + "\n" + \
-        "Cost to feed: " + str(self.save_file["Servers"][server.id]["Parrot"]["Cost"]) + "\n" \
-        "Days living (age): " + str(self.save_file["Servers"][server.id]["Parrot"]["DaysAlive"])) #+ "\n" + eventually show who he's currently with
+        fullness = "Fullness: " + str(self.save_file["Servers"][server.id]["Parrot"]["Fullness"]) + " out of " + str(self.save_file["Servers"][server.id]["Parrot"]["Appetite"])
+        feed_cost = "Cost to feed: " + str(self.save_file["Servers"][server.id]["Parrot"]["Cost"])
+        days_living = "Days living (age): " + str(self.save_file["Servers"][server.id]["Parrot"]["DaysAlive"])
+        
+        if (self.save_file["Servers"][server.id]["Parrot"]["Fullness"] / self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) >= 0.5:
+            time_until_starved = "Time until starved: Parrot has been fed enough food that he won't starve today!"
+        elif self.save_file["Servers"][server.id]["Parrot"]["DaysAlive"] == 0:
+            time_until_starved = "Time until starved: " + str(datetime.timedelta(seconds = round((86400*2) - ((time.time() - (Parrot.start_time + (86400 * 0.2))) % 86400))))
+        else:
+            time_until_starved = "Time until starved: " + str(datetime.timedelta(seconds = round(86400 - ((time.time() - (Parrot.start_time + (86400 * 0.2))) % 86400))))
+        # say you're checking every 60 seconds instead of 86400 seconds
+        # (Parrot.start_time + (60 * 0.2)) is the actual start time of daily_check
+        # (time.time() - actual_start_time) is how long it's been (in seconds) since daily_check started
+        # (time_since_started % 60) resets to 0 every time it hits a multiple of 60
+        # (60 - time_since_started_capped_at_60) is how long is left until the check runs again
+        # if Parrot has been alive 0 days, (60*2 - time_since_started_capped_at_60) is how long is left until he will starve
+        # datetime.timedelta formats this number of seconds into 0:00:00 
+
+        await self.bot.say(fullness + "\n" + feed_cost + "\n" + days_living + "\n" + time_until_starved) #+ "\n" + eventually show who he's currently with
 
     @parrot.command(name="setcost", pass_context=True)
     @checks.admin_or_permissions(manage_server=True) #only admins can use this command
@@ -116,9 +134,9 @@ class Parrot:
         #servers that use a Parrot command for the first time get added to the database and still follow the starvecheck schedule below
         #make sure Parrot is loaded at the time you want the starvation check to be every day
 
-        start_time = time.time() - (86400 * 0.2) #24 hours is 86400 seconds 
+        Parrot.start_time = time.time() - (86400 * 0.2) #24 hours is 86400 seconds 
         while True:
-            await asyncio.sleep(86400 - ((time.time() - start_time) % 86400)) #sleep for what's left of the time (approx. 80%)
+            await asyncio.sleep(86400 - ((time.time() - Parrot.start_time) % 86400)) #sleep for what's left of the time (approx. 80%)
             for serverid in self.save_file["Servers"]:
                 if (self.save_file["Servers"][serverid]["Parrot"]["DaysAlive"] != 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
                     await self.bot.send_message(self.bot.get_server(serverid), "I'm going to die of starvation soon...")
