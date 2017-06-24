@@ -46,37 +46,37 @@ class Parrot:
 
         # check if user has a bank account to withdraw credits from
         if not bank.account_exists(ctx.message.author):
-            return await self.bot.say("You need to have a bank account to feed Parrot. Use !bank register to open one.")
+            return await self.bot.say("You need to have a bank account with credits to feed me. Use !bank register to open one.")
 
         # make sure the server is in the database
         self.add_server(ctx.message.server)
 
         # feeding negative pellets is not allowed
         if amount <= 0:
-            return await self.bot.say("You must feed Parrot more than 0 pellets.")
+            return await self.bot.say("You can't feed me nothing!")
 
         # make sure parrot isn't full
         if self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Fullness"] == self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Appetite"]:
-            return await self.bot.say("Parrot is full! Don't make him fat.")
+            return await self.bot.say("I'm full! I don't want to get fat.")
 
         # make sure parrot doesn't get overfed
         if self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Fullness"] + amount > self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Appetite"]:
             amount -= self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Fullness"] + amount - self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Appetite"]
-            await self.bot.say("You cannot feed Parrot more than his appetite. You will only feed Parrot " + str(amount) + " pellets.")
+            await self.bot.say("I don't want to be too full. I'll only eat " + str(amount) + " pellets, and you can keep the rest.")
 
         usercost = amount * self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Cost"]
 
         # confirmation prompt
-        await self.bot.say("You are about to spend " + str(usercost) + " credits to feed Parrot " + str(amount) + " pellets. Reply \"yes\" to confirm.")
+        await self.bot.say("You are about to spend " + str(usercost) + " credits to feed me " + str(amount) + " pellets. Reply \"yes\" to confirm.")
         response = await self.bot.wait_for_message(author=ctx.message.author)
         if response.content.lower().strip() != "yes":
-            return await self.bot.say("Okay then, but don't let Parrot starve!")
+            return await self.bot.say("Okay then, but don't let me starve!")
 
         # deduct usercost from their credits account
         if bank.can_spend(ctx.message.author, usercost):
             bank.withdraw_credits(ctx.message.author, usercost)
         else:
-            return await self.bot.say("You don't have enough credits to feed Parrot that much.")
+            return await self.bot.say("You don't have enough credits to feed me that much.")
 
         # record how much the user has fed for the day
         if ctx.message.author.id not in self.save_file["Servers"][ctx.message.server.id]["Feeders"]: # set up user's dict in the database
