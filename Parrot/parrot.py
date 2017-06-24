@@ -44,28 +44,29 @@ class Parrot:
     async def feed(self, ctx, amount: int):
         """Feed the parrot!"""
         bank = self.bot.get_cog('Economy').bank
+        server = ctx.message.server
 
         # check if user has a bank account to withdraw credits from
         if not bank.account_exists(ctx.message.author):
             return await self.bot.say("You need to have a bank account with credits to feed me. Use !bank register to open one.")
 
         # make sure the server is in the data file
-        self.add_server(ctx.message.server)
+        self.add_server(server)
 
         # feeding negative pellets is not allowed
         if amount <= 0:
             return await self.bot.say("You can't feed me nothing!")
 
         # make sure parrot isn't full
-        if self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Fullness"] == self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Appetite"]:
+        if self.save_file["Servers"][server.id]["Parrot"]["Fullness"] == self.save_file["Servers"][server.id]["Parrot"]["Appetite"]:
             return await self.bot.say("I'm full! I don't want to get fat.")
 
         # make sure parrot doesn't get overfed
-        if self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Fullness"] + amount > self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Appetite"]:
-            amount -= self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Fullness"] + amount - self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Appetite"]
+        if self.save_file["Servers"][server.id]["Parrot"]["Fullness"] + amount > self.save_file["Servers"][server.id]["Parrot"]["Appetite"]:
+            amount -= self.save_file["Servers"][server.id]["Parrot"]["Fullness"] + amount - self.save_file["Servers"][server.id]["Parrot"]["Appetite"]
             await self.bot.say("I don't want to be too full. I'll only eat " + str(amount) + " pellets, and you can keep the rest.")
 
-        usercost = amount * self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Cost"]
+        usercost = amount * self.save_file["Servers"][server.id]["Parrot"]["Cost"]
 
         # confirmation prompt
         await self.bot.say("You are about to spend " + str(usercost) + " credits to feed me " + str(amount) + " pellets. Reply \"yes\" to confirm.")
@@ -80,13 +81,13 @@ class Parrot:
             return await self.bot.say("You don't have enough credits to feed me that much.")
 
         # record how much the user has fed for the day
-        if ctx.message.author.id not in self.save_file["Servers"][ctx.message.server.id]["Feeders"]: # set up user's dict in the data file
-            self.save_file["Servers"][ctx.message.server.id]["Feeders"][ctx.message.author.id] = amount
+        if ctx.message.author.id not in self.save_file["Servers"][server.id]["Feeders"]: # set up user's dict in the data file
+            self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id] = amount
         else:
-            self.save_file["Servers"][ctx.message.server.id]["Feeders"][ctx.message.author.id] += amount
+            self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id] += amount
 
         # change parrot's fullness level
-        self.save_file["Servers"][ctx.message.server.id]["Parrot"]["Fullness"] += amount
+        self.save_file["Servers"][server.id]["Parrot"]["Fullness"] += amount
 
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
         return await self.bot.say("Om nom nom. Thanks!")
