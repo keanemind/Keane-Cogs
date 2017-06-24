@@ -11,14 +11,14 @@ from __main__ import send_cmd_help
 from .utils import checks
 from .utils.dataIO import dataIO
 
-SERVER_DEFAULT = {"Parrot":{"Appetite":0,
-                            "LoopsAlive":0,
+SERVER_DEFAULT = {"Parrot":{"Appetite":0, # the maximum number of pellets Parrot can be fed (resets every starve_check loop)
+                            "LoopsAlive":0, # the number of starve_check loops the Parrot has gone through
                             "UserWith":"",
-                            "Fullness":0,
-                            "Cost":5,
+                            "Fullness":0, # the number of pellets Parrot has in his belly
+                            "Cost":5, # the cost of feeding Parrot 1 pellet
                             "StarvedLoops":0 # tracks what phase of starvation Parrot is in
                            },
-                  "Feeders":{}
+                  "Feeders":{} # contains user IDs as keys and the number of pellet's they've fed as the value (resets every starve_check loop)
                  }
 
 SAVE_FILEPATH = "data/KeaneCogs/parrot/parrot.json"
@@ -34,8 +34,9 @@ class Parrot:
         self.bot = bot
 
         self.starve_time = copy.deepcopy(self.save_file["Global"]["StarveTime"])
+        # this is the variable used by the starve_check pauses
         # the current running starve_time is set only when the cog is first loaded.
-        # reset the cog to apply a change to StarveTime
+        # reset the cog to apply a change to ["StarveTime"] saved by setstarvetime
 
         self.loop_task = bot.loop.create_task(self.starve_check()) # remember to also change the unload function
 
@@ -48,7 +49,7 @@ class Parrot:
         if not bank.account_exists(ctx.message.author):
             return await self.bot.say("You need to have a bank account with credits to feed me. Use !bank register to open one.")
 
-        # make sure the server is in the database
+        # make sure the server is in the data file
         self.add_server(ctx.message.server)
 
         # feeding negative pellets is not allowed
@@ -79,7 +80,7 @@ class Parrot:
             return await self.bot.say("You don't have enough credits to feed me that much.")
 
         # record how much the user has fed for the day
-        if ctx.message.author.id not in self.save_file["Servers"][ctx.message.server.id]["Feeders"]: # set up user's dict in the database
+        if ctx.message.author.id not in self.save_file["Servers"][ctx.message.server.id]["Feeders"]: # set up user's dict in the data file
             self.save_file["Servers"][ctx.message.server.id]["Feeders"][ctx.message.author.id] = amount
         else:
             self.save_file["Servers"][ctx.message.server.id]["Feeders"][ctx.message.author.id] += amount
@@ -101,11 +102,11 @@ class Parrot:
     async def parrotinfo(self, ctx):
         """Information about the parrot"""
         server = ctx.message.server
-        self.add_server(server) # make sure the server is in the database
+        self.add_server(server) # make sure the server is in the data file
 
         fullness = "Fullness: " + str(self.save_file["Servers"][server.id]["Parrot"]["Fullness"]) + " out of " + str(self.save_file["Servers"][server.id]["Parrot"]["Appetite"])
         feed_cost = "Cost to feed: " + str(self.save_file["Servers"][server.id]["Parrot"]["Cost"])
-        days_living = "Days living (age): " + str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400) # displays actual days living, not Parrot days
+        days_living = "Days living (age): " + str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400) # displays actual days lived, not number of loops
 
         if (self.save_file["Servers"][server.id]["Parrot"]["Fullness"] / self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) >= 0.5:
             time_until_starved = "Time until Parrot {}: Parrot has been fed enough food that he won't starve today!".format(PARROT_INFO_SAYINGS[self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"]])
@@ -128,7 +129,7 @@ class Parrot:
     async def parrot_set_cost(self, ctx, cost: int):
         """Change how much it costs to feed the parrot 1 pellet"""
         server = ctx.message.server
-        self.add_server(server) # make sure the server is in the database
+        self.add_server(server) # make sure the server is in the data file
         if cost >= 0:
             self.save_file["Servers"][server.id]["Parrot"]["Cost"] = cost
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
@@ -136,7 +137,7 @@ class Parrot:
         else:
             return await self.bot.say("Cost must be at least 0.")
 
-    @parrot.command(name="setstarvetime", pass_context=True, no_pm=False)
+    @parrot.command(name="setstarvetime", pass_context=True, no_pm=False) # setstarvetime still cannot be used in PM?
     @checks.is_owner() # only the bot OWNER can use this command
     async def parrot_set_starve_time(self, ctx, seconds: int):
         """Change how long (in seconds) server members have to feed Parrot before he starves"""
@@ -158,7 +159,7 @@ class Parrot:
         """Runs in a loop to periodically check whether Parrot has starved or not"""
         # check if starved. if starved, leave and wipe data
         # otherwise, reset settings except permanent ones (generate new appetite)
-        # servers that use a Parrot command for the first time get added to the database and still follow the starvecheck schedule below
+        # servers that use a Parrot command for the first time get added to the data file and still follow the starvecheck schedule below
 
         # IMPORTANT: make sure Parrot is loaded at the time you want the starvation check to be every day
 
@@ -167,6 +168,7 @@ class Parrot:
             await asyncio.sleep(self.starve_time - ((time.time() - Parrot.start_time) % self.starve_time)) # sleep for what's left of the time (approx. 80% of self.starve_time)
             for serverid in self.save_file["Servers"]:
                 if (self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] > 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
+                    # different warnings depending on what stage of starvation Parrot is in
                     if self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] == 0:
                         await self.bot.send_message(self.bot.get_server(serverid), "I'm quite hungry...")
                     elif self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] == 1:
@@ -176,18 +178,19 @@ class Parrot:
 
             await asyncio.sleep(self.starve_time * 0.2) # sleep for 20% of the time
             for serverid in list(self.save_file["Servers"]):
-                # don't check on the first loop to give new servers a chance, and see if the server has starved Parrot (if he's less than halfway fed)
+                # don't check on the first loop to give new servers a chance in case they got added at an unlucky time (right before the check happens)
                 if (self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] > 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
+                    # if it's not the first loop AND the users have not fed Parrot halfway...
                     if self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] == 2:
-                        # die to starvation
+                        # if Parrot has been on stage 2 of starvation, stage 3 is death; die to starvation
                         await self.bot.send_message(self.bot.get_server(serverid), "Oh no! I've starved to death!\nGoodbye, cruel world!")
                         await self.bot.leave_server(self.bot.get_server(serverid)) # leave the server. disable when testing
 
-                        # delete server from database
+                        # delete server from data file
                         del self.save_file["Servers"][serverid]
 
                     else:
-                        # not dead yet, but dying
+                        # not dead yet, but dying; Parrot advances to the next stage of starvation
                         self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] += 1
                         self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] += 1
                         self.save_file["Servers"][serverid]["Parrot"]["Appetite"] = round(random.normalvariate(50*(1.75**self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"]), 6))
@@ -196,7 +199,7 @@ class Parrot:
                         self.save_file["Servers"][serverid]["Feeders"].clear() # https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
                 else:
                     # healthy; reset for the next loop
-                    self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] = 0 # reset StarvedLoops
+                    self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] = 0 # reset StarvedLoops because Parrot is healthy now
                     self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] += 1
                     self.save_file["Servers"][serverid]["Parrot"]["Appetite"] = round(random.normalvariate(50*(1.75**self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"]), 6))
                     self.save_file["Servers"][serverid]["Parrot"]["Fullness"] = 0
@@ -211,7 +214,7 @@ class Parrot:
             self.save_file["Servers"][server.id] = copy.deepcopy(SERVER_DEFAULT)
             self.save_file["Servers"][server.id]["Parrot"]["Appetite"] = round(random.normalvariate(50, 6))
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
-            print("New server \"" + server.name + "\" found and added to Parrot database!")
+            print(str(datetime.datetime.now()) + "New server \"" + server.name + "\" found and added to Parrot data file!")
 
         return
 
