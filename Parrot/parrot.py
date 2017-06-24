@@ -15,7 +15,8 @@ SERVER_DEFAULT = {"Parrot":{"Appetite":0,
                             "LoopsAlive":0,
                             "UserWith":"",
                             "Fullness":0,
-                            "Cost":5
+                            "Cost":5,
+                            "StarvedLoops":0
                            },
                   "Feeders":{}
                  }
@@ -102,7 +103,7 @@ class Parrot:
 
         fullness = "Fullness: " + str(self.save_file["Servers"][server.id]["Parrot"]["Fullness"]) + " out of " + str(self.save_file["Servers"][server.id]["Parrot"]["Appetite"])
         feed_cost = "Cost to feed: " + str(self.save_file["Servers"][server.id]["Parrot"]["Cost"])
-        days_living = "Days living (age): " + str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400)
+        days_living = "Days living (age): " + str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400) # displays actual days living, not Parrot days
 
         if (self.save_file["Servers"][server.id]["Parrot"]["Fullness"] / self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) >= 0.5:
             time_until_starved = "Time until starved: Parrot has been fed enough food that he won't starve today!"
@@ -170,22 +171,27 @@ class Parrot:
             for serverid in list(self.save_file["Servers"]):
                 # don't check on the first loop to give new servers a chance, and see if the server has starved Parrot (if he's less than halfway fed)
                 if (self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] > 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
-                    # die to starvation
-                    await self.bot.send_message(self.bot.get_server(serverid), "Oh no! I've starved to death!\nGoodbye, cruel world!")
-                    await self.bot.leave_server(self.bot.get_server(serverid)) # leave the server. disable when testing
+                    if self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] == 2:
+                        # die to starvation
+                        await self.bot.send_message(self.bot.get_server(serverid), "Oh no! I've starved to death!\nGoodbye, cruel world!")
+                        await self.bot.leave_server(self.bot.get_server(serverid)) # leave the server. disable when testing
 
-                    # delete server from database
-                    del self.save_file["Servers"][serverid]
+                        # delete server from database
+                        del self.save_file["Servers"][serverid]
+
+                    else:
+                        # not dead yet, but dying
+                        self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] += 1
 
                 else:
-                    # if didn't starve, continue living
-                    self.save_file["Servers"][serverid]["Parrot"]["Appetite"] = round(random.normalvariate(50, 6))
-                    self.save_file["Servers"][serverid]["Parrot"]["Fullness"] = 0
-                    self.save_file["Servers"][serverid]["Parrot"]["UserWith"] = ""
-                    self.save_file["Servers"][serverid]["Feeders"].clear() # https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
+                    # healthy; reset for the next loop
+                    self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] = 0 # reset StarvedLoops
+                    self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] += 1
 
-            for serverid in self.save_file["Servers"]:
-                self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] += 1
+                self.save_file["Servers"][serverid]["Parrot"]["Appetite"] = round(random.normalvariate(50*(1.75**self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"]), 6))
+                self.save_file["Servers"][serverid]["Parrot"]["Fullness"] = 0
+                self.save_file["Servers"][serverid]["Parrot"]["UserWith"] = ""
+                self.save_file["Servers"][serverid]["Feeders"].clear() # https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
 
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
