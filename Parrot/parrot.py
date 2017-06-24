@@ -16,12 +16,14 @@ SERVER_DEFAULT = {"Parrot":{"Appetite":0,
                             "UserWith":"",
                             "Fullness":0,
                             "Cost":5,
-                            "StarvedLoops":0
+                            "StarvedLoops":0 # tracks what phase of starvation Parrot is in
                            },
                   "Feeders":{}
                  }
 
 SAVE_FILEPATH = "data/KeaneCogs/parrot/parrot.json"
+
+PARROT_INFO_SAYINGS = ["begins starving", "starves to near death", "dies of starvation"]
 
 class Parrot:
     """Commands related to feeding the bot"""
@@ -106,17 +108,17 @@ class Parrot:
         days_living = "Days living (age): " + str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400) # displays actual days living, not Parrot days
 
         if (self.save_file["Servers"][server.id]["Parrot"]["Fullness"] / self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) >= 0.5:
-            time_until_starved = "Time until starved: Parrot has been fed enough food that he won't starve today!"
+            time_until_starved = "Time until {}: Parrot has been fed enough food that he won't starve today!".format(PARROT_INFO_SAYINGS[self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"]])
         elif self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] == 0:
-            time_until_starved = "Time until starved: " + str(datetime.timedelta(seconds=round((self.starve_time * 2) - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
+            time_until_starved = "Time until {}: ".format(PARROT_INFO_SAYINGS[self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"]]) + str(datetime.timedelta(seconds=round((self.starve_time * 2) - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
         else:
-            time_until_starved = "Time until starved: " + str(datetime.timedelta(seconds=round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
+            time_until_starved = "Time until {}: ".format(PARROT_INFO_SAYINGS[self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"]]) + str(datetime.timedelta(seconds=round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
         # say you're checking every 60 seconds instead of self.starve_time seconds
         # (Parrot.start_time + (60 * 0.2)) is the actual start time of starve_check
         # (time.time() - actual_start_time) is how long it's been (in seconds) since starve_check started
         # (time_since_started % 60) resets to 0 every time it hits a multiple of 60
         # (60 - time_since_started_capped_at_60) is how long is left until the check runs again
-        # if Parrot has been alive 0 days, (60*2 - time_since_started_capped_at_60) is how long is left until he will starve
+        # if Parrot has been alive 0 days, (60*2 - time_since_started_capped_at_60) is how long is left until the next starve phase
         # datetime.timedelta formats this number of seconds into 0:00:00
 
         return await self.bot.say(fullness + "\n" + feed_cost + "\n" + days_living + "\n" + time_until_starved)
@@ -165,9 +167,14 @@ class Parrot:
             await asyncio.sleep(self.starve_time - ((time.time() - Parrot.start_time) % self.starve_time)) # sleep for what's left of the time (approx. 80% of self.starve_time)
             for serverid in self.save_file["Servers"]:
                 if (self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] > 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
-                    await self.bot.send_message(self.bot.get_server(serverid), "I'm going to die of starvation soon...")
+                    if self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] == 0:
+                        await self.bot.send_message(self.bot.get_server(serverid), "I'm quite hungry...")
+                    elif self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] == 1:
+                        await self.bot.send_message(self.bot.get_server(serverid), "I'm so hungry I feel weak...")
+                    else:
+                        await self.bot.send_message(self.bot.get_server(serverid), "I'm going to die of starvation tonight if I don't get fed...")
 
-            await asyncio.sleep(self.starve_time * 0.2) # sleep for 20% of the time... since this is in a separate thread, so users can feed during this sleep
+            await asyncio.sleep(self.starve_time * 0.2) # sleep for 20% of the time
             for serverid in list(self.save_file["Servers"]):
                 # don't check on the first loop to give new servers a chance, and see if the server has starved Parrot (if he's less than halfway fed)
                 if (self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] > 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
@@ -182,16 +189,19 @@ class Parrot:
                     else:
                         # not dead yet, but dying
                         self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] += 1
-
+                        self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] += 1
+                        self.save_file["Servers"][serverid]["Parrot"]["Appetite"] = round(random.normalvariate(50*(1.75**self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"]), 6))
+                        self.save_file["Servers"][serverid]["Parrot"]["Fullness"] = 0
+                        self.save_file["Servers"][serverid]["Parrot"]["UserWith"] = ""
+                        self.save_file["Servers"][serverid]["Feeders"].clear() # https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
                 else:
                     # healthy; reset for the next loop
                     self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] = 0 # reset StarvedLoops
                     self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] += 1
-
-                self.save_file["Servers"][serverid]["Parrot"]["Appetite"] = round(random.normalvariate(50*(1.75**self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"]), 6))
-                self.save_file["Servers"][serverid]["Parrot"]["Fullness"] = 0
-                self.save_file["Servers"][serverid]["Parrot"]["UserWith"] = ""
-                self.save_file["Servers"][serverid]["Feeders"].clear() # https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
+                    self.save_file["Servers"][serverid]["Parrot"]["Appetite"] = round(random.normalvariate(50*(1.75**self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"]), 6))
+                    self.save_file["Servers"][serverid]["Parrot"]["Fullness"] = 0
+                    self.save_file["Servers"][serverid]["Parrot"]["UserWith"] = ""
+                    self.save_file["Servers"][serverid]["Feeders"].clear() # https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
 
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
