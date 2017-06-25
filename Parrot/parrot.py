@@ -23,7 +23,7 @@ SERVER_DEFAULT = {"Parrot":{"Appetite":0, # the maximum number of pellets Parrot
 
 SAVE_FILEPATH = "data/KeaneCogs/parrot/parrot.json"
 
-PARROT_INFO_SAYINGS = ["begins starving", "starves to near death", "dies of starvation"]
+PARROT_INFO_SAYINGS = ["healthy", "starving", "deathbed (will die if not fed!)"]
 
 class Parrot:
     """Commands related to feeding the bot"""
@@ -105,16 +105,24 @@ class Parrot:
         server = ctx.message.server
         self.add_server(server) # make sure the server is in the data file
 
-        fullness = "Fullness: " + str(self.save_file["Servers"][server.id]["Parrot"]["Fullness"]) + " out of " + str(self.save_file["Servers"][server.id]["Parrot"]["Appetite"])
-        feed_cost = "Cost to feed: " + str(self.save_file["Servers"][server.id]["Parrot"]["Cost"])
-        days_living = "Days living (age): " + str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400) # displays actual days lived, not number of loops
+        fullness = "Fullness: " + str(self.save_file["Servers"][server.id]["Parrot"]["Fullness"]) + " out of " + str(self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) + " pellets"
+        feed_cost = "Cost to feed: " + str(self.save_file["Servers"][server.id]["Parrot"]["Cost"]) + " credits per pellet"
+        days_living = "Age: " + str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400) + " days" # displays actual days lived, not number of loops
+        status = "Status: " + PARROT_INFO_SAYINGS[self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"]]
+
+        if self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 0:
+            time_until_starved = "Time until Parrot begins starving: "
+        elif self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 1:
+            time_until_starved = "Time until Parrot becomes deathly hungry: "
+        else:
+            time_until_starved = "Time until Parrot dies of starvation: "
 
         if (self.save_file["Servers"][server.id]["Parrot"]["Fullness"] / self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) >= 0.5:
-            time_until_starved = "Time until Parrot {}: Parrot has been fed enough food that he won't starve today!".format(PARROT_INFO_SAYINGS[self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"]])
+            time_until_starved += "Parrot has been fed enough food that he won't starve today!"
         elif self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] == 0:
-            time_until_starved = "Time until Parrot {}: ".format(PARROT_INFO_SAYINGS[self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"]]) + str(datetime.timedelta(seconds=round((self.starve_time * 2) - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
+            time_until_starved += str(datetime.timedelta(seconds=round((self.starve_time * 2) - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
         else:
-            time_until_starved = "Time until Parrot {}: ".format(PARROT_INFO_SAYINGS[self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"]]) + str(datetime.timedelta(seconds=round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
+            time_until_starved += str(datetime.timedelta(seconds=round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
         # say you're checking every 60 seconds instead of self.starve_time seconds
         # (Parrot.start_time + (60 * 0.2)) is the actual start time of starve_check
         # (time.time() - actual_start_time) is how long it's been (in seconds) since starve_check started
@@ -123,7 +131,7 @@ class Parrot:
         # if Parrot has been alive 0 days, (60*2 - time_since_started_capped_at_60) is how long is left until the next starve phase
         # datetime.timedelta formats this number of seconds into 0:00:00
 
-        return await self.bot.say(fullness + "\n" + feed_cost + "\n" + days_living + "\n" + time_until_starved)
+        return await self.bot.say(fullness + "\n" + feed_cost + "\n" + days_living + "\n" + status + "\n" + time_until_starved)
 
     @parrot.command(name="setcost", pass_context=True)
     @checks.admin_or_permissions(manage_server=True) # only server admins can use this command
