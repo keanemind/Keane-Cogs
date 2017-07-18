@@ -118,7 +118,7 @@ class Parrot:
             time_until_starved = "Time until Parrot dies of starvation: "
 
         if (self.save_file["Servers"][server.id]["Parrot"]["Fullness"] / self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) >= 0.5:
-            time_until_starved += "Parrot has been fed enough food that he won't starve today!"
+            time_until_starved = "Parrot has been fed enough food that he won't starve for now! \nTime until Parrot can be fed: " + str(datetime.timedelta(seconds=round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
         elif self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] == 0:
             time_until_starved += str(datetime.timedelta(seconds=round((self.starve_time * 2) - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
         else:
