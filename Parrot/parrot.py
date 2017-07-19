@@ -23,8 +23,6 @@ SERVER_DEFAULT = {"Parrot":{"Appetite":0, # the maximum number of pellets Parrot
 
 SAVE_FILEPATH = "data/KeaneCogs/parrot/parrot.json"
 
-PARROT_INFO_SAYINGS = ["healthy", "starving", "deathbed (will die if not fed!)"]
-
 class Parrot:
     """Commands related to feeding the bot"""
     start_time = 0.0
@@ -39,6 +37,7 @@ class Parrot:
         # reset the cog to apply a change to ["StarveTime"] saved by setstarvetime
 
         self.loop_task = bot.loop.create_task(self.starve_check()) # remember to also change the unload function
+        self.loop_task2 = bot.loop.create_task(self.parrot_with())
 
     @commands.command(pass_context=True, no_pm=True)
     async def feed(self, ctx, amount: int):
@@ -82,9 +81,9 @@ class Parrot:
 
         # record how much the user has fed for the day
         if ctx.message.author.id not in self.save_file["Servers"][server.id]["Feeders"]: # set up user's dict in the data file
-            self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id] = amount
-        else:
-            self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id] += amount
+            self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id] = {"PelletsFed":0}
+
+        self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id]["PelletsFed"] += amount
 
         # change parrot's fullness level
         self.save_file["Servers"][server.id]["Parrot"]["Fullness"] += amount
@@ -108,8 +107,16 @@ class Parrot:
         fullness = "Fullness: " + str(self.save_file["Servers"][server.id]["Parrot"]["Fullness"]) + " out of " + str(self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) + " pellets"
         feed_cost = "Cost to feed: " + str(self.save_file["Servers"][server.id]["Parrot"]["Cost"]) + " credits per pellet"
         days_living = "Age: " + str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400) + " days" # displays actual days lived, not number of loops
-        status = "Status: " + PARROT_INFO_SAYINGS[self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"]]
 
+        # status
+        if self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 0:
+            status = "Status: healthy"
+        elif self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 1:
+            status = "Status: starving"
+        else:
+            status = "Status: deathbed (will die if not fed!)"
+
+        # time_until_starved
         if self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 0:
             time_until_starved = "Time until Parrot begins starving: "
         elif self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 1:
@@ -117,8 +124,10 @@ class Parrot:
         else:
             time_until_starved = "Time until Parrot dies of starvation: "
 
+        # time_until_starved continued
         if (self.save_file["Servers"][server.id]["Parrot"]["Fullness"] / self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) >= 0.5:
             time_until_starved = "Parrot has been fed enough food that he won't starve for now! \nTime until Parrot can be fed: " + str(datetime.timedelta(seconds=round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
+            status = "Status: recovering"
         elif self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] == 0:
             time_until_starved += str(datetime.timedelta(seconds=round((self.starve_time * 2) - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
         else:
@@ -131,7 +140,10 @@ class Parrot:
         # if Parrot has been alive 0 days, (60*2 - time_since_started_capped_at_60) is how long is left until the next starve phase
         # datetime.timedelta formats this number of seconds into 0:00:00
 
-        return await self.bot.say(fullness + "\n" + feed_cost + "\n" + days_living + "\n" + status + "\n" + time_until_starved)
+        user = await self.bot.get_user_info(self.save_file["Servers"][server.id]["Parrot"]["UserWith"])
+        userwith = "Parrot is currently giving special powers to: {}".format("nobody" if self.save_file["Servers"][server.id]["Parrot"]["UserWith"] == "" else user.name)
+
+        return await self.bot.say(fullness + "\n" + feed_cost + "\n" + days_living + "\n" + status + "\n" + time_until_starved + "\n" + userwith)
 
     @parrot.command(name="setcost", pass_context=True)
     @checks.admin_or_permissions(manage_server=True) # only server admins can use this command
@@ -172,7 +184,7 @@ class Parrot:
 
         # IMPORTANT: make sure Parrot is loaded at the time you want the starvation check to be every day
 
-        Parrot.start_time = time.time() - (self.starve_time * 0.2)
+        Parrot.start_time = time.time() - (self.starve_time * 0.2) #subtract 20% of starve_time so that the first sleep is for 80% not 100% of starve_time
         while True:
             await asyncio.sleep(self.starve_time - ((time.time() - Parrot.start_time) % self.starve_time)) # sleep for what's left of the time (approx. 80% of self.starve_time)
             for serverid in self.save_file["Servers"]:
@@ -183,7 +195,7 @@ class Parrot:
                     elif self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] == 1:
                         await self.bot.send_message(self.bot.get_server(serverid), "I'm so hungry I feel weak...")
                     else:
-                        await self.bot.send_message(self.bot.get_server(serverid), "I'm going to die of starvation tonight if I don't get fed...")
+                        await self.bot.send_message(self.bot.get_server(serverid), "I'm going to die of starvation very soon if I don't get fed...")
 
             await asyncio.sleep(self.starve_time * 0.2) # sleep for 20% of the time
             for serverid in list(self.save_file["Servers"]):
@@ -217,6 +229,40 @@ class Parrot:
 
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
+    async def parrot_with(self):
+        """Runs in a loop to periodically set someone (or nobody) as the person Parrot is with"""
+        start_time = time.time()
+        while True:
+            for serverid in self.save_file["Servers"]:
+                # Randomly choose who Parrot is with. This could be nobody, represented by ""
+                weights = [(self.save_file["Servers"][serverid]["Feeders"][feederid]["PelletsFed"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"])*100 for feederid in self.save_file["Servers"][serverid]["Feeders"]]
+                population = [feederid for feederid in self.save_file["Servers"][serverid]["Feeders"]]
+                weights.append(100 - sum(weights))
+                population.append("")
+                try:
+                    self.save_file["Servers"][serverid]["Parrot"]["UserWith"] = random.choices(population, weights)[0] #random.choices returns a list
+                except AttributeError:
+                    # DIY random.choices alternative for scrubs who don't have Python 3.6
+                    total = 0
+                    cum_weights = []
+                    for num in weights:
+                        total += num
+                        cum_weights.append(total)
+
+                    rand = random.uniform(0, 100)
+                    for index in range(len(cum_weights)): # apparently I'm supposed to use enumerate to be more Pythonic
+                        if cum_weights[index] >= rand:
+                            self.save_file["Servers"][serverid]["Parrot"]["UserWith"] = population[index]
+                            break
+
+                if self.save_file["Servers"][serverid]["Parrot"]["UserWith"] != "":
+                    userwith = self.save_file["Servers"][serverid]["Parrot"]["UserWith"] # this is an ID number
+                    if "HeistBoostAvailable" not in self.save_file["Servers"][serverid]["Feeders"][userwith]:
+                        self.save_file["Servers"][serverid]["Feeders"][userwith]["HeistBoostAvailable"] = True # give the chosen user HeistBoost ability if they didn't have it before
+            
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
+            await asyncio.sleep(1200 - ((time.time() - start_time) % 1200)) # 20 minutes between updates of who Parrot is with
+
     def add_server(self, server):
         """Adds the server to the file if it isn't already in it"""
         if server.id not in self.save_file["Servers"]:
@@ -227,8 +273,19 @@ class Parrot:
 
         return
 
+    def parrot_with_currentuser(self, server):
+        """Returns the user ID of whoever Parrot is with"""
+        return self.save_file["Servers"][server.id]["Parrot"]["UserWith"]
+
+    def heist_boost_available(self, server, user, availability=True):
+        """Returns whether the user has a Heist boost available"""
+        if availability is False:
+            self.save_file["Servers"][server.id]["Feeders"][user.id]["HeistBoostAvailable"] = False
+        return self.save_file["Servers"][server.id]["Feeders"][user.id]["HeistBoostAvailable"]
+
     def __unload(self):
         self.loop_task.cancel()
+        self.loop_task2.cancel()
 
 def dir_check():
     """Creates a folder and save file for the cog if they don't exist"""
