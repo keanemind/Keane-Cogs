@@ -37,7 +37,7 @@ class Parrot:
         # reset the cog to apply a change to ["StarveTime"] saved by setstarvetime
 
         self.loop_task = bot.loop.create_task(self.starve_check()) # remember to also change the unload function
-        self.loop_task2 = bot.loop.create_task(self.parrot_with())
+        self.loop_task2 = bot.loop.create_task(self.parrot_shoulder())
 
     @commands.command(pass_context=True, no_pm=True)
     async def feed(self, ctx, amount: int):
@@ -236,7 +236,7 @@ class Parrot:
 
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
-    async def parrot_with(self):
+    async def parrot_shoulder(self):
         """Runs in a loop to periodically set someone (or nobody) as the person Parrot is with"""
         start_time = time.time()
         while True:
@@ -280,7 +280,7 @@ class Parrot:
 
         return
 
-    def parrot_with_currentuser(self, server):
+    def parrot_shoulder_currentuser(self, server):
         """Returns the user ID of whoever Parrot is with"""
         return self.save_file["Servers"][server.id]["Parrot"]["UserWith"]
 
