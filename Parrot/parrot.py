@@ -41,7 +41,7 @@ class Parrot:
 
     @commands.command(pass_context=True, no_pm=True)
     async def feed(self, ctx, amount: int):
-        """Feed the parrot!"""
+        """Feed the parrot! Use \"!help parrot\" for more information."""
         bank = self.bot.get_cog('Economy').bank
         server = ctx.message.server
 
@@ -93,7 +93,14 @@ class Parrot:
 
     @commands.group(pass_context=True, no_pm=True)
     async def parrot(self, ctx):
-        """Parrot needs to be fed! Every day, Parrot has a different appetite value, which is how many food pellets he would like to be fed for the day. Spend your credits to feed Parrot pellets using the !feed command, and find out how full Parrot is or what his appetite is by using the !parrot info command."""
+        """Parrot needs to be fed! Every day, Parrot has a different appetite value, 
+        which is how many food pellets he would like to be fed for the day. 
+        Spend your credits to feed Parrot pellets using the !feed command, 
+        and find out how full Parrot is or what his appetite is by using the !parrot info command. 
+        Every 20 minutes, Parrot perches on the shoulder of a random user who has fed him. 
+        The fraction of Parrot's appetite that you have fed him is your chance of being perched on by Parrot. 
+        In return for providing your shoulder to him, Parrot will help you and give you powers. 
+        For example, he can assist you with Heists."""
 
         if ctx.invoked_subcommand is None:
             await send_cmd_help(ctx)
@@ -161,7 +168,7 @@ class Parrot:
     @parrot.command(name="setstarvetime", pass_context=True, no_pm=False) # setstarvetime still cannot be used in PM?
     @checks.is_owner() # only the bot OWNER can use this command
     async def parrot_set_starve_time(self, ctx, seconds: int):
-        """Change how long (in seconds) server members have to feed Parrot before he starves"""
+        """Change how long (in seconds) server members have to feed Parrot"""
 
         # confirmation prompt
         await self.bot.say("This is a global setting that affects all servers the bot is connected to. Parrot periodically checks whether he has starved or not. Are you sure you want Parrot to wait " + str(seconds) + " SECONDS between checks? Reply \"yes\" to confirm.")
