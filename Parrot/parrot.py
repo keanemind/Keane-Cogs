@@ -111,30 +111,32 @@ class Parrot:
         server = ctx.message.server
         self.add_server(server) # make sure the server is in the data file
 
-        fullness = "Fullness: " + str(self.save_file["Servers"][server.id]["Parrot"]["Fullness"]) + " out of " + str(self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) + " pellets"
-        feed_cost = "Cost to feed: " + str(self.save_file["Servers"][server.id]["Parrot"]["Cost"]) + " credits per pellet"
-        days_living = "Age: " + str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400) + " days" # displays actual days lived, not number of loops
+        fullness = str(self.save_file["Servers"][server.id]["Parrot"]["Fullness"]) + " out of " + str(self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) + " pellets"
+        feed_cost = str(self.save_file["Servers"][server.id]["Parrot"]["Cost"]) + " credits per pellet"
+        days_living = str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400) + " days" # displays actual days lived, not number of loops
+        description = "If Parrot is not fed enough to be half full by the time the timer reaches 0, he will enter the next phase of starvation. Use \"!help parrot\" for more information."
 
         # status
         if self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 0:
-            status = "Status: healthy"
+            status = "healthy"
         elif self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 1:
-            status = "Status: starving"
+            status = "starving"
         else:
-            status = "Status: deathbed (will die if not fed!)"
+            status = "deathbed (will die if not fed!)"
 
         # time_until_starved
         if self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 0:
-            time_until_starved = "Time until Parrot begins starving: "
+            time_until_starved = "Time until Parrot begins starving: \n"
         elif self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 1:
-            time_until_starved = "Time until Parrot becomes deathly hungry: "
+            time_until_starved = "Time until Parrot becomes deathly hungry: \n"
         else:
-            time_until_starved = "Time until Parrot dies of starvation: "
+            time_until_starved = "Time until Parrot dies of starvation: \n"
 
         # time_until_starved continued
         if (self.save_file["Servers"][server.id]["Parrot"]["Fullness"] / self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) >= 0.5:
-            time_until_starved = "Parrot has been fed enough food that he won't starve for now! \nTime until fullness resets: " + str(datetime.timedelta(seconds=round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
-            status = "Status: recovering"
+            time_until_starved = "time until fullness resets: \n" + str(datetime.timedelta(seconds=round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
+            status = "recovering"
+            description = "Parrot has been fed enough food that he won't starve for now. Use \"!help parrot\" for more information."
         elif self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] == 0:
             time_until_starved += str(datetime.timedelta(seconds=round((self.starve_time * 2) - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
         else:
@@ -147,10 +149,23 @@ class Parrot:
         # if Parrot has been alive 0 days, (60*2 - time_since_started_capped_at_60) is how long is left until the next starve phase
         # datetime.timedelta formats this number of seconds into 0:00:00
 
-        user = await self.bot.get_user_info(self.save_file["Servers"][server.id]["Parrot"]["UserWith"])
-        userwith = "Parrot is currently giving special powers to: {}".format("nobody" if self.save_file["Servers"][server.id]["Parrot"]["UserWith"] == "" else user.name)
+        if self.save_file["Servers"][server.id]["Parrot"]["UserWith"] != "":
+            userwith = (await self.bot.get_user_info(self.save_file["Servers"][server.id]["Parrot"]["UserWith"])).mention
+        else:
+            userwith = "nobody"
 
-        return await self.bot.say(fullness + "\n" + feed_cost + "\n" + days_living + "\n" + status + "\n" + time_until_starved + "\n" + userwith)
+        embed = discord.Embed(color=discord.Color.teal(), description=description)
+        embed.title = "Parrot Information"
+        embed.timestamp = datetime.datetime.utcfromtimestamp(time.time())
+        embed.set_thumbnail(url="{}".format(self.bot.user.avatar_url if self.bot.user.avatar_url != "" else self.bot.user.default_avatar_url))
+        embed.set_footer(text="Made by Keane")
+        embed.add_field(name="Fullness", value=fullness)
+        embed.add_field(name="Cost to feed", value=feed_cost)
+        embed.add_field(name="Age", value=days_living)
+        embed.add_field(name="Status", value=status)
+        embed.add_field(name="Perched on", value=userwith)
+        embed.add_field(name="Timer", value=time_until_starved)
+        return await self.bot.say(embed=embed)
 
     @parrot.command(name="setcost", pass_context=True)
     @checks.admin_or_permissions(manage_server=True) # only server admins can use this command
