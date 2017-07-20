@@ -106,7 +106,7 @@ class Parrot:
             await send_cmd_help(ctx)
 
     @parrot.command(name="info", pass_context=True)
-    async def parrotinfo(self, ctx):
+    async def parrot_info(self, ctx):
         """Information about the parrot"""
         server = ctx.message.server
         self.add_server(server) # make sure the server is in the data file
