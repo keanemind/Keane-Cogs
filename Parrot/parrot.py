@@ -23,8 +23,6 @@ SERVER_DEFAULT = {"Parrot":{"Appetite":0, # the maximum number of pellets Parrot
 
 SAVE_FILEPATH = "data/KeaneCogs/parrot/parrot.json"
 
-PARROT_INFO_SAYINGS = ["begins starving", "starves to near death", "dies of starvation"]
-
 class Parrot:
     """Commands related to feeding the bot"""
     start_time = 0.0
@@ -39,10 +37,11 @@ class Parrot:
         # reset the cog to apply a change to ["StarveTime"] saved by setstarvetime
 
         self.loop_task = bot.loop.create_task(self.starve_check()) # remember to also change the unload function
+        self.loop_task2 = bot.loop.create_task(self.parrot_shoulder())
 
     @commands.command(pass_context=True, no_pm=True)
     async def feed(self, ctx, amount: int):
-        """Feed the parrot!"""
+        """Feed the parrot! Use \"!help parrot\" for more information."""
         bank = self.bot.get_cog('Economy').bank
         server = ctx.message.server
 
@@ -82,9 +81,9 @@ class Parrot:
 
         # record how much the user has fed for the day
         if ctx.message.author.id not in self.save_file["Servers"][server.id]["Feeders"]: # set up user's dict in the data file
-            self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id] = amount
-        else:
-            self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id] += amount
+            self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id] = {"PelletsFed":0}
+
+        self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id]["PelletsFed"] += amount
 
         # change parrot's fullness level
         self.save_file["Servers"][server.id]["Parrot"]["Fullness"] += amount
@@ -94,7 +93,14 @@ class Parrot:
 
     @commands.group(pass_context=True, no_pm=True)
     async def parrot(self, ctx):
-        """Parrot needs to be fed! Every day, Parrot has a different appetite value, which is how many food pellets he would like to be fed for the day. Spend your credits to feed Parrot pellets using the !feed command, and find out how full Parrot is or what his appetite is by using the !parrot info command."""
+        """Parrot needs to be fed! Every day, Parrot has a different appetite value, 
+        which is how many food pellets he would like to be fed for the day. 
+        Spend your credits to feed Parrot pellets using the !feed command, 
+        and find out how full Parrot is or what his appetite is by using the !parrot info command. 
+        Every 20 minutes, Parrot perches on the shoulder of a random user who has fed him. 
+        The fraction of Parrot's appetite that you have fed him is your chance of being perched on by Parrot. 
+        In return for providing your shoulder to him, Parrot will help you and give you powers. 
+        For example, he can assist you with Heists."""
 
         if ctx.invoked_subcommand is None:
             await send_cmd_help(ctx)
@@ -105,16 +111,36 @@ class Parrot:
         server = ctx.message.server
         self.add_server(server) # make sure the server is in the data file
 
-        fullness = "Fullness: " + str(self.save_file["Servers"][server.id]["Parrot"]["Fullness"]) + " out of " + str(self.save_file["Servers"][server.id]["Parrot"]["Appetite"])
-        feed_cost = "Cost to feed: " + str(self.save_file["Servers"][server.id]["Parrot"]["Cost"])
-        days_living = "Days living (age): " + str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400) # displays actual days lived, not number of loops
+        fullness = str(self.save_file["Servers"][server.id]["Parrot"]["Fullness"]) + " out of " + str(self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) + " pellets"
+        feed_cost = str(self.save_file["Servers"][server.id]["Parrot"]["Cost"]) + " credits per pellet"
+        days_living = str((self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] * self.starve_time) // 86400) + " days" # displays actual days lived, not number of loops
+        description = "If Parrot is not fed enough to be half full by the time the timer reaches 0, he will enter the next phase of starvation. Use \"!help parrot\" for more information."
 
-        if (self.save_file["Servers"][server.id]["Parrot"]["Fullness"] / self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) >= 0.5:
-            time_until_starved = "Time until Parrot {}: Parrot has been fed enough food that he won't starve today!".format(PARROT_INFO_SAYINGS[self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"]])
-        elif self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] == 0:
-            time_until_starved = "Time until Parrot {}: ".format(PARROT_INFO_SAYINGS[self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"]]) + str(datetime.timedelta(seconds=round((self.starve_time * 2) - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
+        # status
+        if self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 0:
+            status = "healthy"
+        elif self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 1:
+            status = "starving"
         else:
-            time_until_starved = "Time until Parrot {}: ".format(PARROT_INFO_SAYINGS[self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"]]) + str(datetime.timedelta(seconds=round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
+            status = "deathbed (will die if not fed!)"
+
+        # time_until_starved
+        if self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 0:
+            time_until_starved = "Time until Parrot begins starving: \n"
+        elif self.save_file["Servers"][server.id]["Parrot"]["StarvedLoops"] == 1:
+            time_until_starved = "Time until Parrot becomes deathly hungry: \n"
+        else:
+            time_until_starved = "Time until Parrot dies of starvation: \n"
+
+        # time_until_starved continued
+        if (self.save_file["Servers"][server.id]["Parrot"]["Fullness"] / self.save_file["Servers"][server.id]["Parrot"]["Appetite"]) >= 0.5:
+            time_until_starved = "time until fullness resets: \n" + str(datetime.timedelta(seconds=round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
+            status = "recovering"
+            description = "Parrot has been fed enough food that he won't starve for now. Use \"!help parrot\" for more information."
+        elif self.save_file["Servers"][server.id]["Parrot"]["LoopsAlive"] == 0:
+            time_until_starved += str(datetime.timedelta(seconds=round((self.starve_time * 2) - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
+        else:
+            time_until_starved += str(datetime.timedelta(seconds=round(self.starve_time - ((time.time() - (Parrot.start_time + (self.starve_time * 0.2))) % self.starve_time))))
         # say you're checking every 60 seconds instead of self.starve_time seconds
         # (Parrot.start_time + (60 * 0.2)) is the actual start time of starve_check
         # (time.time() - actual_start_time) is how long it's been (in seconds) since starve_check started
@@ -123,7 +149,23 @@ class Parrot:
         # if Parrot has been alive 0 days, (60*2 - time_since_started_capped_at_60) is how long is left until the next starve phase
         # datetime.timedelta formats this number of seconds into 0:00:00
 
-        return await self.bot.say(fullness + "\n" + feed_cost + "\n" + days_living + "\n" + time_until_starved)
+        if self.save_file["Servers"][server.id]["Parrot"]["UserWith"] != "":
+            userwith = (await self.bot.get_user_info(self.save_file["Servers"][server.id]["Parrot"]["UserWith"])).mention
+        else:
+            userwith = "nobody"
+
+        embed = discord.Embed(color=discord.Color.teal(), description=description)
+        embed.title = "Parrot Information"
+        embed.timestamp = datetime.datetime.utcfromtimestamp(time.time())
+        embed.set_thumbnail(url="{}".format(self.bot.user.avatar_url if self.bot.user.avatar_url != "" else self.bot.user.default_avatar_url))
+        embed.set_footer(text="Made by Keane")
+        embed.add_field(name="Fullness", value=fullness)
+        embed.add_field(name="Cost to feed", value=feed_cost)
+        embed.add_field(name="Age", value=days_living)
+        embed.add_field(name="Status", value=status)
+        embed.add_field(name="Perched on", value=userwith)
+        embed.add_field(name="Timer", value=time_until_starved)
+        return await self.bot.say(embed=embed)
 
     @parrot.command(name="setcost", pass_context=True)
     @checks.admin_or_permissions(manage_server=True) # only server admins can use this command
@@ -141,7 +183,7 @@ class Parrot:
     @parrot.command(name="setstarvetime", pass_context=True, no_pm=False) # setstarvetime still cannot be used in PM?
     @checks.is_owner() # only the bot OWNER can use this command
     async def parrot_set_starve_time(self, ctx, seconds: int):
-        """Change how long (in seconds) server members have to feed Parrot before he starves"""
+        """Change how long (in seconds) server members have to feed Parrot"""
 
         # confirmation prompt
         await self.bot.say("This is a global setting that affects all servers the bot is connected to. Parrot periodically checks whether he has starved or not. Are you sure you want Parrot to wait " + str(seconds) + " SECONDS between checks? Reply \"yes\" to confirm.")
@@ -164,7 +206,7 @@ class Parrot:
 
         # IMPORTANT: make sure Parrot is loaded at the time you want the starvation check to be every day
 
-        Parrot.start_time = time.time() - (self.starve_time * 0.2)
+        Parrot.start_time = time.time() - (self.starve_time * 0.2) #subtract 20% of starve_time so that the first sleep is for 80% not 100% of starve_time
         while True:
             await asyncio.sleep(self.starve_time - ((time.time() - Parrot.start_time) % self.starve_time)) # sleep for what's left of the time (approx. 80% of self.starve_time)
             for serverid in self.save_file["Servers"]:
@@ -175,7 +217,7 @@ class Parrot:
                     elif self.save_file["Servers"][serverid]["Parrot"]["StarvedLoops"] == 1:
                         await self.bot.send_message(self.bot.get_server(serverid), "I'm so hungry I feel weak...")
                     else:
-                        await self.bot.send_message(self.bot.get_server(serverid), "I'm going to die of starvation tonight if I don't get fed...")
+                        await self.bot.send_message(self.bot.get_server(serverid), "I'm going to die of starvation very soon if I don't get fed...")
 
             await asyncio.sleep(self.starve_time * 0.2) # sleep for 20% of the time
             for serverid in list(self.save_file["Servers"]):
@@ -209,6 +251,40 @@ class Parrot:
 
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
+    async def parrot_shoulder(self):
+        """Runs in a loop to periodically set someone (or nobody) as the person Parrot is with"""
+        start_time = time.time()
+        while True:
+            for serverid in self.save_file["Servers"]:
+                # Randomly choose who Parrot is with. This could be nobody, represented by ""
+                weights = [(self.save_file["Servers"][serverid]["Feeders"][feederid]["PelletsFed"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"])*100 for feederid in self.save_file["Servers"][serverid]["Feeders"]]
+                population = [feederid for feederid in self.save_file["Servers"][serverid]["Feeders"]]
+                weights.append(100 - sum(weights))
+                population.append("")
+                try:
+                    self.save_file["Servers"][serverid]["Parrot"]["UserWith"] = random.choices(population, weights)[0] #random.choices returns a list
+                except AttributeError:
+                    # DIY random.choices alternative for scrubs who don't have Python 3.6
+                    total = 0
+                    cum_weights = []
+                    for num in weights:
+                        total += num
+                        cum_weights.append(total)
+
+                    rand = random.uniform(0, 100)
+                    for index in range(len(cum_weights)): # apparently I'm supposed to use enumerate to be more Pythonic
+                        if cum_weights[index] >= rand:
+                            self.save_file["Servers"][serverid]["Parrot"]["UserWith"] = population[index]
+                            break
+
+                if self.save_file["Servers"][serverid]["Parrot"]["UserWith"] != "":
+                    userwith = self.save_file["Servers"][serverid]["Parrot"]["UserWith"] # this is an ID number
+                    if "HeistBoostAvailable" not in self.save_file["Servers"][serverid]["Feeders"][userwith]:
+                        self.save_file["Servers"][serverid]["Feeders"][userwith]["HeistBoostAvailable"] = True # give the chosen user HeistBoost ability if they didn't have it before
+            
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
+            await asyncio.sleep(1200 - ((time.time() - start_time) % 1200)) # 20 minutes between updates of who Parrot is with
+
     def add_server(self, server):
         """Adds the server to the file if it isn't already in it"""
         if server.id not in self.save_file["Servers"]:
@@ -219,8 +295,19 @@ class Parrot:
 
         return
 
+    def parrot_shoulder_currentuser(self, server):
+        """Returns the user ID of whoever Parrot is with"""
+        return self.save_file["Servers"][server.id]["Parrot"]["UserWith"]
+
+    def heist_boost_available(self, server, user, availability=True):
+        """Returns whether the user has a Heist boost available"""
+        if availability is False:
+            self.save_file["Servers"][server.id]["Feeders"][user.id]["HeistBoostAvailable"] = False
+        return self.save_file["Servers"][server.id]["Feeders"][user.id]["HeistBoostAvailable"]
+
     def __unload(self):
         self.loop_task.cancel()
+        self.loop_task2.cancel()
 
 def dir_check():
     """Creates a folder and save file for the cog if they don't exist"""
