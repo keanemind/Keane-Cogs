@@ -37,7 +37,7 @@ class Parrot:
         # reset the cog to apply a change to ["StarveTime"] saved by setstarvetime
 
         self.loop_task = bot.loop.create_task(self.starve_check()) # remember to also change the unload function
-        self.loop_task2 = bot.loop.create_task(self.parrot_shoulder())
+        self.loop_task2 = bot.loop.create_task(self.parrot_perch())
 
     @commands.command(pass_context=True, no_pm=True)
     async def feed(self, ctx, amount: int):
@@ -284,7 +284,7 @@ class Parrot:
 
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
-    async def parrot_shoulder(self):
+    async def parrot_perch(self):
         """Runs in a loop to periodically set someone (or nobody) as the person Parrot is with"""
         start_time = time.time()
         while True:
@@ -330,8 +330,8 @@ class Parrot:
 
         return
 
-    def parrot_shoulder_currentuser(self, server):
-        """Returns the user ID of whoever Parrot is with"""
+    def parrot_perched_on(self, server):
+        """Returns the user ID of whoever Parrot is perched on (this is for Heist.py to use for heist boost)"""
         return self.save_file["Servers"][server.id]["Parrot"]["UserWith"]
 
     def heist_boost_available(self, server, user, availability=True):
