@@ -338,6 +338,7 @@ class Parrot:
         """Returns whether the user has a Heist boost available"""
         if availability is False:
             self.save_file["Servers"][server.id]["Feeders"][user.id]["HeistBoostAvailable"] = False
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
         return self.save_file["Servers"][server.id]["Feeders"][user.id]["HeistBoostAvailable"]
 
     def __unload(self):
