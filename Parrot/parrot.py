@@ -214,6 +214,10 @@ class Parrot:
         if not bank.account_exists(target):
             return await self.bot.say("Your target doesn't have a bank account to steal credits from.")
 
+        # Parrot does not steal from people who have fed him that day
+        if target.id in self.save_file["Servers"][ctx.message.server.id]["Feeders"]:
+            return await self.bot.say("Parrot refuses to steal from someone who has fed him in the current fullness cycle.")
+
         await self.bot.say("Parrot flies off...")
         await asyncio.sleep(3)
 
