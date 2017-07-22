@@ -201,6 +201,8 @@ class Parrot:
     @parrot.command(name="steal", pass_context=True)
     async def parrot_steal(self, ctx, target: discord.Member):
         """Get Parrot to steal up to 1000 of someone's credits for you (can only be used once per user; this limit resets with Parrot's fullness)"""
+        self.add_server(server) # make sure the server is in the data file
+
         if ctx.message.author.id != self.save_file["Servers"][ctx.message.server.id]["Parrot"]["UserWith"]:
             return await self.bot.say("Parrot needs to be perched on you to use this command.")
         if self.save_file["Servers"][ctx.message.server.id]["Feeders"][ctx.message.author.id]["StealAvailable"] is not True:
@@ -336,10 +338,13 @@ class Parrot:
 
     def parrot_perched_on(self, server):
         """Returns the user ID of whoever Parrot is perched on (this is for Heist.py to use for heist boost)"""
+        self.add_server(server) # make sure the server is in the data file
         return self.save_file["Servers"][server.id]["Parrot"]["UserWith"]
 
     def heist_boost_available(self, server, user, availability=True):
         """Returns whether the user has a Heist boost available"""
+        self.add_server(server) # make sure the server is in the data file
+        # checking if user.id is in ["Feeders"] is not necessary because 'if author.id == parrot.parrot_perched_on(server)' is checked in Heist first
         if availability is False:
             self.save_file["Servers"][server.id]["Feeders"][user.id]["HeistBoostAvailable"] = False
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
