@@ -93,13 +93,13 @@ class Parrot:
 
     @commands.group(pass_context=True, no_pm=True)
     async def parrot(self, ctx):
-        """Parrot needs to be fed! Every day, Parrot has a different appetite value, 
-        which is how many food pellets he would like to be fed for the day. 
-        Spend your credits to feed Parrot pellets using the !feed command, 
-        and find out how full Parrot is or what his appetite is by using the !parrot info command. 
-        Every 20 minutes, Parrot perches on the shoulder of a random user who has fed him. 
-        The fraction of Parrot's appetite that you have fed him is your chance of being perched on by Parrot. 
-        In return for providing your shoulder to him, Parrot will help you and give you powers. 
+        """Parrot needs to be fed! Every day, Parrot has a different appetite value,
+        which is how many food pellets he would like to be fed for the day.
+        Spend your credits to feed Parrot pellets using the !feed command,
+        and find out how full Parrot is or what his appetite is by using the !parrot info command.
+        Every 20 minutes, Parrot perches on the shoulder of a random user who has fed him.
+        The fraction of Parrot's appetite that you have fed him is your chance of being perched on by Parrot.
+        In return for providing your shoulder to him, Parrot will help you and give you powers.
         For example, he can assist you with Heists."""
 
         if ctx.invoked_subcommand is None:
@@ -198,6 +198,39 @@ class Parrot:
         else:
             return await self.bot.say("Must be at least 1 second.")
 
+    @parrot.command(name="steal", pass_context=True)
+    async def parrot_steal(self, ctx, target: discord.Member):
+        """Get Parrot to steal up to 1000 of someone's credits for you (can only be used once per user; this limit resets with Parrot's fullness)"""
+        if ctx.message.author.id != self.save_file["Servers"][ctx.message.server.id]["Parrot"]["UserWith"]:
+            return await self.bot.say("Parrot needs to be perched on you to use this command.")
+        if self.save_file["Servers"][ctx.message.server.id]["Feeders"][ctx.message.author.id]["StealAvailable"] is not True:
+            return await self.bot.say("You have already used steal. You must wait until Parrot's fullness resets, and be perched on by him again.")
+
+        bank = self.bot.get_cog('Economy').bank
+
+        # check if users have bank accounts to withdraw credits from
+        if not bank.account_exists(ctx.message.author):
+            return await self.bot.say("You need to have a bank account with credits to store stolen credits. Use !bank register to open one.")
+        if not bank.account_exists(target):
+            return await self.bot.say("Your target doesn't have a bank account to steal credits from.")
+
+        await self.bot.say("Parrot flies off...")
+        await asyncio.sleep(3)
+
+        stolen = round(random.uniform(1, random.uniform(1, 1000)))
+        target_balance = bank.get_balance(target)
+
+        if stolen >= target_balance:
+            bank.transfer_credits(target, ctx.message.author, target_balance)
+            self.save_file["Servers"][ctx.message.server.id]["Feeders"][ctx.message.author.id]["StealAvailable"] = False
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
+            return await self.bot.say("Parrot stole every last credit (" + str(target_balance) + " credits) from " + target.mention + "'s bank account and deposited it in your account!")
+        else:
+            bank.transfer_credits(target, ctx.message.author, stolen)
+            self.save_file["Servers"][ctx.message.server.id]["Feeders"][ctx.message.author.id]["StealAvailable"] = False
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
+            return await self.bot.say("Parrot stole " + str(stolen) + " credits from " + target.mention + "'s bank account and deposited it in your account!")
+
     async def starve_check(self):
         """Runs in a loop to periodically check whether Parrot has starved or not"""
         # check if starved. if starved, leave and wipe data
@@ -281,7 +314,9 @@ class Parrot:
                     userwith = self.save_file["Servers"][serverid]["Parrot"]["UserWith"] # this is an ID number
                     if "HeistBoostAvailable" not in self.save_file["Servers"][serverid]["Feeders"][userwith]:
                         self.save_file["Servers"][serverid]["Feeders"][userwith]["HeistBoostAvailable"] = True # give the chosen user HeistBoost ability if they didn't have it before
-            
+                    if "StealAvailable" not in self.save_file["Servers"][serverid]["Feeders"][userwith]: # this is not necessary. the following line could go under the if statement above this
+                        self.save_file["Servers"][serverid]["Feeders"][userwith]["StealAvailable"] = True # give the chosen user Steal ability if they didn't have it before
+
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
             await asyncio.sleep(1200 - ((time.time() - start_time) % 1200)) # 20 minutes between updates of who Parrot is with
 
