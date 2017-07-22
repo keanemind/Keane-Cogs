@@ -201,7 +201,7 @@ class Parrot:
     @parrot.command(name="steal", pass_context=True)
     async def parrot_steal(self, ctx, target: discord.Member):
         """Get Parrot to steal up to 1000 of someone's credits for you (can only be used once per user; this limit resets with Parrot's fullness)"""
-        self.add_server(server) # make sure the server is in the data file
+        self.add_server(ctx.message.server) # make sure the server is in the data file
 
         if ctx.message.author.id != self.save_file["Servers"][ctx.message.server.id]["Parrot"]["UserWith"]:
             return await self.bot.say("Parrot needs to be perched on you to use this command.")
