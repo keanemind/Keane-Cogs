@@ -200,7 +200,9 @@ class Parrot:
 
     @parrot.command(name="steal", pass_context=True)
     async def parrot_steal(self, ctx, target: discord.Member):
-        """Get Parrot to steal up to 1000 of someone's credits for you (can only be used once per user; this limit resets with Parrot's fullness)"""
+        """Get Parrot to steal up to 1000 of someone's credits for you (can only be used once per user; this limit resets with Parrot's fullness)
+
+        Parrot will not steal from people who have fed him"""
         self.add_server(ctx.message.server) # make sure the server is in the data file
 
         if ctx.message.author.id != self.save_file["Servers"][ctx.message.server.id]["Parrot"]["UserWith"]:
@@ -259,7 +261,7 @@ class Parrot:
                         await self.bot.send_message(self.bot.get_server(serverid), "I'm going to die of starvation very soon if I don't get fed...")
 
             await asyncio.sleep(self.starve_time * 0.2) # sleep for 20% of the time
-            for serverid in list(self.save_file["Servers"]):
+            for serverid in list(self.save_file["Servers"]): # generate a list because servers might be removed from the dict while iterating
                 # don't check on the first loop to give new servers a chance in case they got added at an unlucky time (right before the check happens)
                 if (self.save_file["Servers"][serverid]["Parrot"]["LoopsAlive"] > 0) and ((self.save_file["Servers"][serverid]["Parrot"]["Fullness"] / self.save_file["Servers"][serverid]["Parrot"]["Appetite"]) < 0.5):
                     # if it's not the first loop AND the users have not fed Parrot halfway...
