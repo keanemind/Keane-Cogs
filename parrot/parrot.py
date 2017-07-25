@@ -250,8 +250,6 @@ class Parrot:
         # The try-except clause has been commented out. The calls for functions within audio.py have been changed
         # from self.function() to audio.function() . Newly added lines are labeled with a comment "NEW". No other changes were made.
 
-        audio = self.bot.get_cog('Audio') # NEW
-        url = "https://www.youtube.com/watch?v=XDvuAYySJj0" # This line was changed to be a hard-coded YouTube link instead of being a URL argument. 
         server = ctx.message.server
         self.add_server(server) # NEW
 
@@ -259,6 +257,9 @@ class Parrot:
             return await self.bot.say("Parrot needs to be perched on you to use this command.") # NEW
         if self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id]["AirhornUses"] >= 3: # NEW
             return await self.bot.say("You have already used steal 3 times. You must wait until Parrot's fullness resets, and be perched on by him again.") # NEW
+
+        audio = self.bot.get_cog('Audio') # NEW
+        url = "https://www.youtube.com/watch?v=XDvuAYySJj0" # This line was changed to be a hard-coded YouTube link instead of being a URL argument.
 
         # Checking if playing in current server
 
