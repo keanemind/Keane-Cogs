@@ -319,6 +319,7 @@ class Parrot:
         audio._add_to_queue(server, url)
 
         self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id]["AirhornUses"] += 1 # NEW
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     async def starve_check(self):
         """Runs in a loop to periodically check whether Parrot has starved or not"""
