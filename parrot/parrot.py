@@ -239,6 +239,86 @@ class Parrot:
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
             return await self.bot.say("Parrot stole " + str(stolen) + " credits from " + target.mention + "'s bank account and deposited it in your account!")
 
+    @parrot.command(name="airhorn", pass_context=True, no_pm=True)
+    async def parrot_airhorn(self, ctx, channel: discord.Channel):
+        """Plays an airhorn sound to the target voice channel"""
+        # This is copy-pasted from audio.py's play() function and has been modified to always play an airhorn. 
+        # Audio.py is a part of Red Bot, which is licensed under GPL v3 https://www.gnu.org/licenses/gpl-3.0.en.html
+        # CHANGES:
+        # The function has been renamed to parrot_airhorn, and takes a channel instead of a URL as an argument now.
+        # The URL is now hard-coded to be a YouTube link.
+        # The try-except clause has been commented out. The calls for functions within audio.py have been changed
+        # from self.function() to audio.function() . Newly added lines are labeled with a comment "NEW". No other changes were made.
+
+        audio = self.bot.get_cog('Audio') # NEW
+        url = "https://www.youtube.com/watch?v=XDvuAYySJj0" # This line was changed to be a hard-coded YouTube link instead of being a URL argument. 
+        server = ctx.message.server
+        self.add_server(server) # NEW
+
+        if ctx.message.author.id != self.save_file["Servers"][server.id]["Parrot"]["UserWith"]: # NEW
+            return await self.bot.say("Parrot needs to be perched on you to use this command.") # NEW
+        if self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id]["AirhornUses"] >= 3: # NEW
+            return await self.bot.say("You have already used steal 3 times. You must wait until Parrot's fullness resets, and be perched on by him again.") # NEW
+
+        # Checking if playing in current server
+
+        if audio.is_playing(server):
+            await self.bot.say("Parrot is already playing music in the channel the target is in.")
+            return  # Default to queue
+
+        # Checking already connected, will join if not
+
+        # try:
+        #     audio.has_connect_perm(target, server)
+        # except AuthorNotConnected:
+        #     await self.bot.say("You must join a voice channel before I can"
+        #                        " play anything.")
+        #     return
+        # except UnauthorizedConnect:
+        #     await self.bot.say("I don't have permissions to join your"
+        #                        " voice channel.")
+        #     return
+        # except UnauthorizedSpeak:
+        #     await self.bot.say("I don't have permissions to speak in your"
+        #                        " voice channel.")
+        #     return
+        # except ChannelUserLimit:
+        #     await self.bot.say("Your voice channel is full.")
+        #     return
+
+        if not audio.voice_connected(server):
+            await audio._join_voice_channel(channel)
+        else:  # We are connected but not to the right channel
+            if audio.voice_client(server).channel != channel:
+                await audio._stop_and_disconnect(server)
+                await audio._join_voice_channel(channel)
+
+        # If not playing, spawn a downloader if it doesn't exist and begin
+        #   downloading the next song
+
+        if audio.currently_downloading(server):
+            await audio.bot.say("I'm already downloading a file!")
+            return
+
+        url = url.strip("<>")
+
+        if audio._match_any_url(url):
+            if not audio._valid_playable_url(url):
+                await self.bot.say("That's not a valid URL.")
+                return
+        else:
+            url = url.replace("/", "&#47")
+            url = "[SEARCH:]" + url
+
+        if "[SEARCH:]" not in url and "youtube" in url:
+            url = url.split("&")[0]  # Temp fix for the &list issue
+
+        audio._stop_player(server)
+        audio._clear_queue(server)
+        audio._add_to_queue(server, url)
+
+        self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id]["AirhornUses"] += 1 # NEW
+
     async def starve_check(self):
         """Runs in a loop to periodically check whether Parrot has starved or not"""
         # check if starved. if starved, leave and wipe data
@@ -324,6 +404,8 @@ class Parrot:
                         self.save_file["Servers"][serverid]["Feeders"][userwith]["HeistBoostAvailable"] = True # give the chosen user HeistBoost ability if they didn't have it before
                     if "StealAvailable" not in self.save_file["Servers"][serverid]["Feeders"][userwith]: # this is not necessary. the following line could go under the if statement above this
                         self.save_file["Servers"][serverid]["Feeders"][userwith]["StealAvailable"] = True # give the chosen user Steal ability if they didn't have it before
+                    if "AirhornUses" not in self.save_file["Servers"][serverid]["Feeders"][userwith]:
+                        self.save_file["Servers"][serverid]["Feeders"][userwith]["AirhornUses"] = 0
 
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
             await asyncio.sleep(1200 - ((time.time() - start_time) % 1200)) # 20 minutes between updates of who Parrot is with
