@@ -530,16 +530,23 @@ class Heist:
 
                 # BOOST MODIFICATION
                 parrot = self.bot.get_cog('Parrot')
-                if author.id == parrot.parrot_perched_on(server) and parrot.heist_boost_available(server, author): # if the person can use boost...
-                    await self.bot.say(author.mention + " You have Parrot with you. Would you like to boost this " + t_heist \
-                    + " to increase success chance to 100% and double earnings for all crew? You can only use this once until Parrot's appetite resets. \nReply with \"yes\" to boost.")
+                if (author.id == parrot.parrot_perched_on(server)
+                        and parrot.heist_boost_available(server, author)):
+                    await self.bot.say("{} You have Parrot with you. Would you like to boost "
+                                       "this {} to increase success chance to 100% and double "
+                                       "earnings for all crew? You can only use this once until "
+                                       "Parrot's appetite resets.\n"
+                                       "Reply with \"yes\" to boost."
+                                       .format(author.mention, t_heist))
                     boost_reply = await self.bot.wait_for_message(author=author)
                     if boost_reply.content.lower().strip() == "yes":
                         # activate boost!
                         old_success = settings["Targets"][target]["Success"]
-                        settings["Targets"][target]["Success"] = 100 # 100% success chance (need to change this back afterward)
+                        settings["Targets"][target]["Success"] = 100 # changed back later
                         settings["Targets"][target]["Vault"] *= 2 # double vault
-                        parrot.heist_boost_available(server, author, False) # have Parrot remember that the user used the command and can't use it again
+                        parrot.heist_boost_available(server, author, False) # have Parrot remember that
+                                                                            # the user used the command
+                                                                            # and can't use it again
                         await self.bot.say("Boost activated!")
                     else:
                         await self.bot.say("Boost not used.")
@@ -565,7 +572,8 @@ class Heist:
 
                 # BOOST MODIFICATION
                 try:
-                    settings["Targets"][target]["Success"] = old_success # set success chance back to what it was before boost if boost was used
+                    # set success chance back to what it was before, if boost was used
+                    settings["Targets"][target]["Success"] = old_success
                 except NameError: # old_success doesn't exist because boost was never used
                     pass
 
