@@ -311,7 +311,7 @@ class Parrot:
         # Checking if playing in current server
 
         if audio.is_playing(server):
-            await self.bot.say("Parrot is already playing music in the channel the target is in.")
+            await self.bot.say("Parrot is already playing music in a channel on this server.")
             return  # Default to queue
 
         # Checking already connected, will join if not
