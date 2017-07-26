@@ -213,7 +213,7 @@ class Parrot:
                            "Are you sure you want Parrot to wait {} SECONDS between checks? "
                            "Reply \"yes\" to confirm.".format(seconds))
         response = await self.bot.wait_for_message(timeout=15, author=ctx.message.author)
-        if response.content.lower().strip() != "yes" or response is None:
+        if response is None or response.content.lower().strip() != "yes":
             return await self.bot.say("Setting change cancelled.")
 
         if seconds > 0:
