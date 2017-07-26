@@ -18,11 +18,7 @@ from .utils import checks
 from __main__ import send_cmd_help
 
 # Third party library requirement
-try:
-    from tabulate import tabulate
-    tabulateAvailable = True
-except ImportError:
-    tabulateAvailable = False
+from tabulate import tabulate
 
 
 class HeistError(Exception):
@@ -57,8 +53,8 @@ class Heist:
         self.bot = bot
         self.file_path = "data/JumperCogs/heist/heist.json"
         self.system = dataIO.load_json(self.file_path)
-        self.version = "2.2.25"
-        self.patch = 2.225
+        self.version = "2.3.1"
+        self.patch = 2.31
         self.cycle_task = bot.loop.create_task(self.vault_updater())
 
     @commands.group(pass_context=True, no_pm=True)
@@ -377,13 +373,13 @@ class Heist:
 
         embed = discord.Embed(colour=0x0066FF, description="\n".join(description))
         embed.title = "{} Heist Settings".format(server.name)
-        embed.add_field(name="Heist cost", value=settings["Config"]["Heist Cost"])
-        embed.add_field(name="Base {} cost".format(t_bail), value=settings["Config"]["Bail Base"])
-        embed.add_field(name="Crew gather time", value=timers[0])
-        embed.add_field(name="{} timer".format(t_police), value=timers[1])
+        embed.add_field(name="Heist Cost", value=settings["Config"]["Heist Cost"])
+        embed.add_field(name="Base {} Cost".format(t_bail), value=settings["Config"]["Bail Base"])
+        embed.add_field(name="Crew Gather Time", value=timers[0])
+        embed.add_field(name="{} Timer".format(t_police), value=timers[1])
         embed.add_field(name="Base {} {}".format(t_jail, t_sentence), value=timers[2])
-        embed.add_field(name="Death timer", value=timers[3])
-        embed.add_field(name="Hardcore mode", value=hardcore)
+        embed.add_field(name="Death Timer", value=timers[3])
+        embed.add_field(name="Hardcore Mode", value=hardcore)
         embed.set_footer(text=footer)
 
         await self.bot.say(embed=embed)
@@ -397,18 +393,18 @@ class Heist:
         self.account_check(settings, author)
         player_time = settings["Players"][author.id]["Time Served"]
         base_time = settings["Players"][author.id]["Sentence"]
-        OOB = settings["Players"][author.id]["OOB"]
+        oob = settings["Players"][author.id]["OOB"]
 
         # Theme variables
         t_jail = settings["Theme"]["Jail"]
         t_sentence = settings["Theme"]["Sentence"]
 
-        if settings["Players"][author.id]["Status"] == "Apprehended" or OOB:
+        if settings["Players"][author.id]["Status"] == "Apprehended" or oob:
             remaining = self.cooldown_calculator(player_time, base_time)
             if remaining == "No Cooldown":
                 msg = "You served your time. Enjoy the fresh air of freedom while you can."
-                if OOB:
-                    msg = "You are no longer on probabtion! 3x penalty removed."
+                if oob:
+                    msg = "You are no longer on probation! 3x penalty removed."
                     settings["Players"][author.id]["OOB"] = False
                 settings["Players"][author.id]["Sentence"] = 0
                 settings["Players"][author.id]["Time Served"] = 0
@@ -454,9 +450,9 @@ class Heist:
         path = settings["Players"][author.id]
 
         # Theme variables
-        sentencing = ("{} {}".format(settings["Theme"]["Jail"], settings["Theme"]["Sentence"])).capitalize()
-        t_bail = ("{} Cost".format(settings["Theme"]["Bail"])).capitalize()
-        t_OOB = settings["Theme"]["OOB"].capitalize()
+        sentencing = "{} {}".format(settings["Theme"]["Jail"], settings["Theme"]["Sentence"])
+        t_bail = "{} Cost".format(settings["Theme"]["Bail"])
+        t_oob = settings["Theme"]["OOB"]
 
         sentence = path["Sentence"]
         time_served = path["Time Served"]
@@ -474,12 +470,12 @@ class Heist:
         embed.add_field(name="Status", value=path["Status"])
         embed.add_field(name="Spree", value=path["Spree"])
         embed.add_field(name=t_bail, value=path["Bail Cost"])
-        embed.add_field(name=t_OOB, value=path["OOB"])
+        embed.add_field(name=t_oob, value=path["OOB"])
         embed.add_field(name=sentencing, value=jail_fmt)
         embed.add_field(name="Apprehended", value=path["Jail Counter"])
-        embed.add_field(name="Death timer", value=death_fmt)
-        embed.add_field(name="Total deaths", value=path["Deaths"])
-        embed.add_field(name="Lifetime apprehensions", value=path["Total Jail"])
+        embed.add_field(name="Death Timer", value=death_fmt)
+        embed.add_field(name="Total Deaths", value=path["Deaths"])
+        embed.add_field(name="Lifetime Apprehensions", value=path["Total Jail"])
 
         await self.bot.say(embed=embed)
 
@@ -568,7 +564,7 @@ class Heist:
                            "C\n{}```".format(t_vault, t))
                 else:
                     msg = "No one made it out safe."
-                settings["Config"]["Alert"] = int(time.perf_counter())
+                settings["Config"]["Alert Time"] = int(time.perf_counter())
 
                 # BOOST MODIFICATION
                 try:
@@ -816,10 +812,10 @@ class Heist:
         names = [player.name for player in players]
         bonuses = [subdict["Bonus"] for subdict in settings["Crew"].values()]
         vault = settings["Targets"][target]["Vault"]
-        credits_stolen = int(int(vault) * 0.75 / len(settings["Crew"].keys()))
-        stolen_data = [credits_stolen] * len(settings["Crew"].keys())
+        credits_stolen = int(int(vault) * 0.75 / len(settings["Crew"]))
+        stolen_data = [credits_stolen] * len(settings["Crew"])
         total_winnings = [x + y for x, y in zip(stolen_data, bonuses)]
-        settings["Targets"][target]["Vault"] -= credits_stolen * len(settings["Crew"].keys())
+        settings["Targets"][target]["Vault"] -= stolen_data[0]
         credit_data = list(zip(names, stolen_data, bonuses, total_winnings))
         deposits = list(zip(players, total_winnings))
         self.award_credits(deposits)
@@ -850,9 +846,9 @@ class Heist:
         with open('data/heist/{}.txt'.format(theme)) as f:
             data = f.readlines()
             good = [list(literal_eval(line.replace("|Good| ", "")))
-                    for line in data if line.startswith('|Good|')]
+                    for line in data if line.startswith("|Good|")]
             bad = [list(literal_eval(line.replace("|Bad| ", "")))
-                   for line in data if line.startswith('|Bad|')]
+                   for line in data if line.startswith("|Bad|")]
         return good, bad
 
     def hardcore_handler(self, user):
@@ -874,7 +870,7 @@ class Heist:
             settings["Players"][user.id]["Jail Counter"] += 1
             bail_base = settings["Config"]["Bail Base"]
             offenses = settings["Players"][user.id]["Jail Counter"]
-            sentence_base = settings["Config"]["Bail Base"]
+            sentence_base = settings["Config"]["Sentence Base"]
 
             if offenses > 1:
                 offenses = offenses - 1
@@ -1121,7 +1117,7 @@ class Heist:
                                   "Wait Time": 20, "Hardcore": False, "Police Alert": 60,
                                   "Alert Time": 0, "Sentence Base": 600, "Bail Base": 500,
                                   "Death Timer": 86400, "Theme": "Heist", "Crew Output": "None",
-                                  "Version": 2.225},
+                                  "Version": 2.3},
                        "Theme": {"Jail": "jail", "OOB": "out on bail", "Police": "Police",
                                  "Bail": "bail", "Crew": "crew", "Sentence": "sentence",
                                  "Heist": "heist", "Vault": "vault"},
@@ -1205,7 +1201,4 @@ def setup(bot):
     check_folders()
     check_files()
     n = Heist(bot)
-    if tabulateAvailable:
-        bot.add_cog(n)
-    else:
-        raise RuntimeError("You need to run 'pip3 install tabulate' in command prompt.")
+    bot.add_cog(n)
