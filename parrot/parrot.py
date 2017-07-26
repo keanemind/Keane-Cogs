@@ -103,7 +103,7 @@ class Parrot:
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
         return await self.bot.say("Om nom nom. Thanks!")
 
-    @commands.group(pass_context=True, no_pm=True)
+    @commands.group(pass_context=True)
     async def parrot(self, ctx):
         """Parrot needs to be fed! Every day, Parrot has a different appetite value,
         which is how many food pellets he would like to be fed for the day.
@@ -120,7 +120,7 @@ class Parrot:
         if ctx.invoked_subcommand is None:
             await send_cmd_help(ctx)
 
-    @parrot.command(name="info", pass_context=True)
+    @parrot.command(name="info", pass_context=True, no_pm=True)
     async def parrot_info(self, ctx):
         """Information about the parrot"""
         server = ctx.message.server
@@ -189,7 +189,7 @@ class Parrot:
         embed.add_field(name="Timer", value=time_until_starved_str)
         return await self.bot.say(embed=embed)
 
-    @parrot.command(name="setcost", pass_context=True)
+    @parrot.command(name="setcost", pass_context=True, no_pm=True)
     @checks.admin_or_permissions(manage_server=True)
     async def parrot_set_cost(self, ctx, cost: int):
         """Change how much it costs to feed the parrot 1 pellet"""
@@ -202,7 +202,7 @@ class Parrot:
         else:
             return await self.bot.say("Cost must be at least 0.")
 
-    @parrot.command(name="setstarvetime", pass_context=True, no_pm=False)
+    @parrot.command(name="setstarvetime", pass_context=True) # no_pm=False
     @checks.is_owner()
     async def parrot_set_starve_time(self, ctx, seconds: int):
         """Change how long (in seconds) server members have to feed Parrot"""
@@ -227,7 +227,7 @@ class Parrot:
         else:
             return await self.bot.say("Must be at least 1 second.")
 
-    @parrot.command(name="steal", pass_context=True)
+    @parrot.command(name="steal", pass_context=True, no_pm=True)
     async def parrot_steal(self, ctx, target: discord.Member):
         """Get Parrot to steal up to 1000 of someone's credits for you
         (can only be used once per user; this limit resets with Parrot's fullness)
