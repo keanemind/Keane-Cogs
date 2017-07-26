@@ -46,7 +46,7 @@ class Parrot:
 
     @commands.command(pass_context=True, no_pm=True)
     async def feed(self, ctx, amount: int):
-        """Feed the parrot! Use \"!help parrot\" for more information."""
+        """Feed the parrot! Use \"{prefix}help parrot\" for more information."""
         server = ctx.message.server
 
         # make sure the server is in the data file
@@ -59,7 +59,7 @@ class Parrot:
         # check if user has a bank account to withdraw credits from
         if not bank.account_exists(ctx.message.author):
             return await self.bot.say("You need to have a bank account with credits to feed me. "
-                                      "Use \"!bank register\" to open one.")
+                                      "Use \"{}bank register\" to open one.".format(ctx.prefix))
 
         # feeding negative pellets is not allowed
         if amount <= 0:
@@ -108,8 +108,8 @@ class Parrot:
         """Parrot needs to be fed! Every day, Parrot has a different appetite value,
         which is how many food pellets he would like to be fed for the day.
 
-        Spend your credits to feed Parrot pellets using the !feed command,
-        and find out how full Parrot is or what his appetite is by using the "!parrot info" command.
+        Spend your credits to feed Parrot pellets using the "{prefix}feed" command,
+        and find out how full Parrot is or what his appetite is by using the "{prefix}parrot info" command.
 
         Every 20 minutes, Parrot perches on the shoulder of a random user who has fed him.
         The fraction of Parrot's appetite that you have fed is your chance of being perched on by Parrot.
@@ -133,7 +133,7 @@ class Parrot:
         days_living_str = "{} days".format((parrot["LoopsAlive"] * self.starve_time) // 86400)
         description_str = ("If Parrot is not fed enough to be half full by the time "
                            "the timer reaches 0, he will enter the next phase of "
-                           "starvation. Use \"!help parrot\" for more information.")
+                           "starvation. Use \"{}help parrot\" for more information.".format(ctx.prefix))
 
         # status and time until starved
         if parrot["StarvedLoops"] == 0:
@@ -155,7 +155,7 @@ class Parrot:
             time_until_starved_str = "time until fullness resets:\n" + str(formatted_time)
             status_str = "recovering"
             description_str = ("Parrot has been fed enough food that he won't starve for now. "
-                               "Use \"!help parrot\" for more information.")
+                               "Use \"{}help parrot\" for more information.".format(ctx.prefix))
         elif parrot["LoopsAlive"] == 0:
             formatted_time = datetime.timedelta(seconds=round((self.starve_time * 2) - time_since_last_check))
             time_until_starved_str += str(formatted_time)
@@ -242,7 +242,7 @@ class Parrot:
         error_msg = ""
         if ctx.message.author.id != parrot["UserWith"]:
             error_msg = ("Parrot needs to be perched on you to use this command. "
-                         "Use \"!help parrot\" for more information.")
+                         "Use \"{}help parrot\" for more information.".format(ctx.prefix))
         elif not feeders[ctx.message.author.id]["StealAvailable"]:
             error_msg = ("You have already used steal. You must wait until "
                          "Parrot's fullness resets, and be perched on by him again.")
@@ -299,7 +299,7 @@ class Parrot:
 
         if ctx.message.author.id != self.save_file["Servers"][server.id]["Parrot"]["UserWith"]: # NEW
             return await self.bot.say("Parrot needs to be perched on you to use this command. "
-                                      "Use \"!help parrot\" for more information.") # NEW
+                                      "Use \"{}help parrot\" for more information.".format(ctx.prefix)) # NEW
         if self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id]["AirhornUses"] >= 3: # NEW
             return await self.bot.say("You have already used steal 3 times. You must wait until "
                                       "Parrot's fullness resets, and be perched on by him again.") # NEW
