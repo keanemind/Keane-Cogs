@@ -37,9 +37,9 @@
 |Bad| "{0} drowned in a flooded sealed room.", "Dead"
 
 Jail = jail
-OOB = out on bail
+OOB = out on bribe
 Police = Royal Navy
-Bail = bail
+Bail = bribe
 Crew = crew
 Sentence = sentence
 Heist = raid
