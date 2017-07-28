@@ -135,18 +135,18 @@ class Parrot:
         # status and time_until_starved
         if parrot["StarvedLoops"] == 0:
             status_str = "healthy"
-            time_until_starved_str = "Time until Parrot begins starving:\n"
+            time_until_starved_str = "until Parrot begins\nstarving: "
         elif parrot["StarvedLoops"] == 1:
             status_str = "starving"
-            time_until_starved_str = "Time until Parrot becomes deathly hungry:\n"
+            time_until_starved_str = "until Parrot becomes\ndeathly hungry:\n"
         else:
             status_str = "deathbed (will die if not fed!)"
-            time_until_starved_str = "Time until Parrot dies of starvation:\n"
+            time_until_starved_str = "until Parrot dies of\nstarvation: "
 
         if parrot["Fullness"] / parrot["Appetite"] >= 0.5:
             description_str = ("Parrot has been fed enough food that he won't starve for now. "
                                "Use \"{}help parrot\" for more information.".format(ctx.prefix))
-            time_until_starved_str = "Time until fullness resets:\n"
+            time_until_starved_str = "until fullness resets:\n"
             if parrot["StarvedLoops"] > 0:
                 status_str = "recovering"
         else:
@@ -186,7 +186,7 @@ class Parrot:
         embed.add_field(name="Age", value=days_living_str)
         embed.add_field(name="Status", value=status_str)
         embed.add_field(name="Perched on", value=userwith_str)
-        embed.add_field(name="Timer", value=time_until_starved_str)
+        embed.add_field(name="Countdown", value=time_until_starved_str)
         return await self.bot.say(embed=embed)
 
     @parrot.command(name="setcost", pass_context=True, no_pm=True)
@@ -405,7 +405,9 @@ class Parrot:
 
                 # don't check on the first loop to give new servers a chance
                 # in case they got added at an unlucky time (right before the check happens)
-                if parrot["LoopsAlive"] > 0 and (parrot["Fullness"] / parrot["Appetite"]) < 0.5:
+                if parrot["LoopsAlive"] == 0:
+                    parrot["LoopsAlive"] += 1
+                elif parrot["Fullness"] / parrot["Appetite"] < 0.5:
                     if parrot["StarvedLoops"] == 2:
                         await self.bot.send_message(
                             self.bot.get_server(serverid),
