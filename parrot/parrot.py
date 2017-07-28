@@ -131,40 +131,37 @@ class Parrot:
         fullness_str = "{} out of {} pellets".format(parrot["Fullness"], parrot["Appetite"])
         feed_cost_str = "{} credits per pellet".format(parrot["Cost"])
         days_living_str = "{} days".format((parrot["LoopsAlive"] * self.starve_time) // 86400)
-        description_str = ("If Parrot is not fed enough to be half full by the time "
-                           "the timer reaches 0, he will enter the next phase of "
-                           "starvation. Use \"{}help parrot\" for more information.".format(ctx.prefix))
 
         # status and time_until_starved
+        if parrot["StarvedLoops"] == 0:
+            status_str = "healthy"
+            time_until_starved_str = "Time until Parrot begins starving:\n"
+        elif parrot["StarvedLoops"] == 1:
+            status_str = "starving"
+            time_until_starved_str = "Time until Parrot becomes deathly hungry:\n"
+        else:
+            status_str = "deathbed (will die if not fed!)"
+            time_until_starved_str = "Time until Parrot dies of starvation:\n"
+
+        if parrot["Fullness"] / parrot["Appetite"] >= 0.5:
+            description_str = ("Parrot has been fed enough food that he won't starve for now. "
+                               "Use \"{}help parrot\" for more information.".format(ctx.prefix))
+            time_until_starved_str = "Time until fullness resets:\n"
+            if parrot["StarvedLoops"] > 0:
+                status_str = "recovering"
+        else:
+            description_str = ("If Parrot is not fed enough to be half full by the time "
+                               "the timer reaches 0, he will enter the next phase of "
+                               "starvation. Use \"{}help parrot\" for more information.".format(ctx.prefix))
+
         actual_start_time = Parrot.start_time + (self.starve_time * 0.2)
         time_since_started = time.time() - actual_start_time
         time_since_last_check = time_since_started % self.starve_time
-        if (parrot["Fullness"] / parrot["Appetite"]) >= 0.5:
-            formatted_time = datetime.timedelta(seconds=round(self.starve_time - time_since_last_check))
-            time_until_starved_str = "time until fullness resets:\n" + str(formatted_time)
-            if parrot["StarvedLoops"] == 0:
-                status_str = "healthy"
-            else:
-                status_str = "recovering"
-            description_str = ("Parrot has been fed enough food that he won't starve for now. "
-                               "Use \"{}help parrot\" for more information.".format(ctx.prefix))
-        elif parrot["LoopsAlive"] == 0:
-            status_str = "healthy"
-            time_until_starved_str = "Time until Parrot begins starving:\n"
+        if parrot["LoopsAlive"] == 0:
             formatted_time = datetime.timedelta(seconds=round((self.starve_time * 2) - time_since_last_check))
-            time_until_starved_str += str(formatted_time)
         else:
-            if parrot["StarvedLoops"] == 0:
-                status_str = "healthy"
-                time_until_starved_str = "Time until Parrot begins starving:\n"
-            elif parrot["StarvedLoops"] == 1:
-                status_str = "starving"
-                time_until_starved_str = "Time until Parrot becomes deathly hungry:\n"
-            else:
-                status_str = "deathbed (will die if not fed!)"
-                time_until_starved_str = "Time until Parrot dies of starvation:\n"
             formatted_time = datetime.timedelta(seconds=round(self.starve_time - time_since_last_check))
-            time_until_starved_str += str(formatted_time)
+        time_until_starved_str += str(formatted_time)
         # say you're checking every 60 seconds instead of self.starve_time seconds
         # (Parrot.start_time + (60 * 0.2)) is the actual start time of starve_check
         # (time.time() - actual_start_time) is how long it's been since starve_check started
