@@ -13,17 +13,17 @@ from .utils import checks
 from .utils.dataIO import dataIO
 
 SERVER_DEFAULT = {"Parrot":{"Appetite":0, # the maximum number of pellets Parrot can be fed
-                                          # (resets every starve_check loop)
-                            "LoopsAlive":0, # the number of starve_check loops so far
+                                          # (reset by starve_check)
+                            "LoopsAlive":0, # the number of starve_loop loops so far
                             "UserWith":"", # ID of user Parrot is perched on
-                                           # (resets every starve_check loop)
+                                           # (reset by starve_check)
                             "Fullness":0, # the number of pellets Parrot has in his belly
-                                          # (resets every starve_check loop)
+                                          # (reset by starve_check)
                             "Cost":5, # the cost of feeding Parrot 1 pellet
                             "StarvedLoops":0 # tracks what phase of starvation Parrot is in
                            },
                   "Feeders":{} # contains user IDs as keys and dicts as values
-                               # (resets every starve_check loop)
+                               # (reset by starve_check)
                  }
 
 SAVE_FILEPATH = "data/KeaneCogs/parrot/parrot.json"
@@ -37,11 +37,11 @@ class Parrot:
         self.bot = bot
 
         self.starve_time = copy.deepcopy(self.save_file["Global"]["StarveTime"])
-        # this is the variable used by the starve_check pauses
+        # this is the variable used by the starve_loop pauses
         # the current running starve_time is set only when the cog is first loaded.
         # reset the cog to apply a change to ["StarveTime"] saved by setstarvetime
 
-        self.loop_task = bot.loop.create_task(self.starve_check()) # remember to change __unload()
+        self.loop_task = bot.loop.create_task(self.starve_loop()) # remember to change __unload()
         self.loop_task2 = bot.loop.create_task(self.parrot_perch())
 
     @commands.command(pass_context=True, no_pm=True)
@@ -163,8 +163,8 @@ class Parrot:
             formatted_time = datetime.timedelta(seconds=round(self.starve_time - time_since_last_check))
         time_until_starved_str += str(formatted_time)
         # say you're checking every 60 seconds instead of self.starve_time seconds
-        # (Parrot.start_time + (60 * 0.2)) is the actual start time of starve_check
-        # (time.time() - actual_start_time) is how long it's been since starve_check started
+        # (Parrot.start_time + (60 * 0.2)) is the actual start time of starve_loop
+        # (time.time() - actual_start_time) is how long it's been since starve_loop started
         # (time_since_started % 60) resets to 0 every time it hits a multiple of 60
         # (60 - time_since_started_capped_at_60) is how long is left until the check runs again
         # if Parrot has been alive 0 days, it's (60*2 - time_since_started_capped_at_60)
@@ -219,13 +219,22 @@ class Parrot:
         if seconds > 0:
             self.save_file["Global"]["StarveTime"] = seconds
             dataIO.save_json(SAVE_FILEPATH, self.save_file) # IMPORTANT this does not affect
-                                                            # the starve_check function until
+                                                            # the starve_loop function until
                                                             # the cog is reloaded. see __init__
             return await self.bot.say("Set period between starvation checks to {} seconds. "
                                       "This setting will not go into effect until the cog "
                                       "is reloaded.".format(seconds))
         else:
             return await self.bot.say("Must be at least 1 second.")
+
+    @parrot.command(name="checknow", pass_context=True) # no_pm=False
+    @checks.is_owner()
+    async def parrot_check_now(self, ctx):
+        """Execute a starve check immediately. This will move Parrot to the next
+        appetite loop if he survives."""
+        await self.starve_check()
+        return await self.bot.send_message(ctx.message.author,
+                                           "starve_check was executed.")
 
     @parrot.command(name="steal", pass_context=True, no_pm=True)
     async def parrot_steal(self, ctx, target: discord.Member):
@@ -368,7 +377,7 @@ class Parrot:
         self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id]["AirhornUses"] += 1 # NEW
         dataIO.save_json(SAVE_FILEPATH, self.save_file) # NEW
 
-    async def starve_check(self):
+    async def starve_loop(self):
         """Runs in a loop to periodically check whether Parrot has starved or not."""
         # check if starved. if starved, leave and wipe data
         # otherwise, reset settings except permanent ones (generate new appetite)
@@ -399,43 +408,7 @@ class Parrot:
                             "I'm going to die of starvation very soon if I don't get fed...")
 
             await asyncio.sleep(self.starve_time * 0.2)
-            for serverid in list(self.save_file["Servers"]): # generate a list because servers might
-                                                             # be removed from the dict while iterating
-                parrot = self.save_file["Servers"][serverid]["Parrot"] # maybe unnecessary
-
-                # don't check on the first loop to give new servers a chance
-                # in case they got added at an unlucky time (right before the check happens)
-                if parrot["LoopsAlive"] == 0:
-                    parrot["LoopsAlive"] += 1
-                elif parrot["Fullness"] / parrot["Appetite"] < 0.5:
-                    if parrot["StarvedLoops"] == 2:
-                        await self.bot.send_message(
-                            self.bot.get_server(serverid),
-                            "Oh no! I've starved to death!\n"
-                            "Goodbye, cruel world!")
-                        await self.bot.leave_server(self.bot.get_server(serverid))
-                        del self.save_file["Servers"][serverid]
-
-                    else:
-                        # advance to the next stage of starvation
-                        parrot["StarvedLoops"] += 1
-                        parrot["LoopsAlive"] += 1
-                        parrot["Appetite"] = round(random.normalvariate(50*(1.75**parrot["StarvedLoops"]), 6))
-                        parrot["Fullness"] = 0
-                        parrot["UserWith"] = ""
-                        self.save_file["Servers"][serverid]["Feeders"].clear()
-                        # https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
-                else:
-                    # healthy; reset for the next loop
-                    parrot["StarvedLoops"] = 0
-                    parrot["LoopsAlive"] += 1
-                    parrot["Appetite"] = round(random.normalvariate(50*(1.75**parrot["StarvedLoops"]), 6))
-                    parrot["Fullness"] = 0
-                    parrot["UserWith"] = ""
-                    self.save_file["Servers"][serverid]["Feeders"].clear()
-                    # https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
-
-            dataIO.save_json(SAVE_FILEPATH, self.save_file)
+            await self.starve_check()
 
     async def parrot_perch(self):
         """Runs in a loop to periodically set someone (or nobody) as the person Parrot is with."""
@@ -477,6 +450,48 @@ class Parrot:
 
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
             await asyncio.sleep(1200 - ((time.time() - start_time) % 1200)) # 20 minutes
+
+    async def starve_check(self):
+        """Check if Parrot has starved or not.
+        If Parrot has starved, leave the server. If he has survived,
+        move on to the next loop."""
+        for serverid in list(self.save_file["Servers"]): # generate a list because servers might
+                                                            # be removed from the dict while iterating
+            parrot = self.save_file["Servers"][serverid]["Parrot"] # maybe unnecessary
+
+            # don't check on the first loop to give new servers a chance
+            # in case they got added at an unlucky time (right before the check happens)
+            if parrot["LoopsAlive"] == 0:
+                parrot["LoopsAlive"] += 1
+            elif parrot["Fullness"] / parrot["Appetite"] < 0.5:
+                if parrot["StarvedLoops"] == 2:
+                    await self.bot.send_message(
+                        self.bot.get_server(serverid),
+                        "Oh no! I've starved to death!\n"
+                        "Goodbye, cruel world!")
+                    await self.bot.leave_server(self.bot.get_server(serverid))
+                    del self.save_file["Servers"][serverid]
+
+                else:
+                    # advance to the next stage of starvation
+                    parrot["StarvedLoops"] += 1
+                    parrot["LoopsAlive"] += 1
+                    parrot["Appetite"] = round(random.normalvariate(50*(1.75**parrot["StarvedLoops"]), 6))
+                    parrot["Fullness"] = 0
+                    parrot["UserWith"] = ""
+                    self.save_file["Servers"][serverid]["Feeders"].clear()
+                    # https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
+            else:
+                # healthy; reset for the next loop
+                parrot["StarvedLoops"] = 0
+                parrot["LoopsAlive"] += 1
+                parrot["Appetite"] = round(random.normalvariate(50*(1.75**parrot["StarvedLoops"]), 6))
+                parrot["Fullness"] = 0
+                parrot["UserWith"] = ""
+                self.save_file["Servers"][serverid]["Feeders"].clear()
+                # https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
+
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     def add_server(self, server):
         """Adds the server to the file if it isn't already in it."""
