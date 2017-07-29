@@ -140,7 +140,7 @@ class Parrot:
             status_str = "starving"
             time_until_starved_str = "until Parrot becomes\ndeathly hungry:\n"
         else:
-            status_str = "deathbed (will die if not fed!)"
+            status_str = "deathbed\n(will die if not fed!)"
             time_until_starved_str = "until Parrot dies of\nstarvation: "
 
         if parrot["Fullness"] / parrot["Appetite"] >= 0.5:
