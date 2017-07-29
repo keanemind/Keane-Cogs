@@ -1,4 +1,4 @@
-"""A cog that requires server users to feed the bot in return for benefits"""
+"""A cog that requires server users to feed the bot in return for benefits."""
 import os
 import random
 import asyncio
@@ -29,7 +29,7 @@ SERVER_DEFAULT = {"Parrot":{"Appetite":0, # the maximum number of pellets Parrot
 SAVE_FILEPATH = "data/KeaneCogs/parrot/parrot.json"
 
 class Parrot:
-    """Commands related to feeding the bot"""
+    """Commands related to feeding the bot."""
     start_time = 0.0
 
     def __init__(self, bot):
@@ -122,7 +122,7 @@ class Parrot:
 
     @parrot.command(name="info", pass_context=True, no_pm=True)
     async def parrot_info(self, ctx):
-        """Information about the parrot"""
+        """Information about the parrot."""
         server = ctx.message.server
         self.add_server(server) # make sure the server is in the data file
 
@@ -192,7 +192,7 @@ class Parrot:
     @parrot.command(name="setcost", pass_context=True, no_pm=True)
     @checks.admin_or_permissions(manage_server=True)
     async def parrot_set_cost(self, ctx, cost: int):
-        """Change how much it costs to feed the parrot 1 pellet"""
+        """Change how much it costs to feed the parrot 1 pellet."""
         server = ctx.message.server
         self.add_server(server) # make sure the server is in the data file
         if cost >= 0:
@@ -205,7 +205,7 @@ class Parrot:
     @parrot.command(name="setstarvetime", pass_context=True) # no_pm=False
     @checks.is_owner()
     async def parrot_set_starve_time(self, ctx, seconds: int):
-        """Change how long (in seconds) server members have to feed Parrot"""
+        """Change how long (in seconds) server members have to feed Parrot."""
 
         # confirmation prompt
         await self.bot.say("This is a global setting that affects all servers the bot is connected to. "
@@ -229,9 +229,9 @@ class Parrot:
 
     @parrot.command(name="steal", pass_context=True, no_pm=True)
     async def parrot_steal(self, ctx, target: discord.Member):
-        """Get Parrot to steal up to 1000 of someone's credits for you
-        (can only be used once per user; this limit resets with Parrot's fullness)
-        Parrot will not steal from people who have fed him"""
+        """Get Parrot to steal up to 1000 of someone's credits for you.
+        One use per user; this limit resets with Parrot's fullness.
+        Parrot will not steal from people who have fed him."""
         self.add_server(ctx.message.server) # make sure the server is in the data file
 
         feeders = self.save_file["Servers"][ctx.message.server.id]["Feeders"]
@@ -279,7 +279,7 @@ class Parrot:
 
     @parrot.command(name="airhorn", pass_context=True, no_pm=True)
     async def parrot_airhorn(self, ctx, channel: discord.Channel):
-        """Plays an airhorn sound to the target voice channel"""
+        """Plays an airhorn sound to the target voice channel."""
         # This is copy-pasted from audio.py's play() function and has
         # been modified to always play an airhorn.
         # Audio.py is a part of Red Bot, which is licensed under GPL v3
@@ -369,7 +369,7 @@ class Parrot:
         dataIO.save_json(SAVE_FILEPATH, self.save_file) # NEW
 
     async def starve_check(self):
-        """Runs in a loop to periodically check whether Parrot has starved or not"""
+        """Runs in a loop to periodically check whether Parrot has starved or not."""
         # check if starved. if starved, leave and wipe data
         # otherwise, reset settings except permanent ones (generate new appetite)
         # servers that use a Parrot command for the first time get added to the data file
@@ -438,7 +438,7 @@ class Parrot:
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     async def parrot_perch(self):
-        """Runs in a loop to periodically set someone (or nobody) as the person Parrot is with"""
+        """Runs in a loop to periodically set someone (or nobody) as the person Parrot is with."""
         start_time = time.time()
         while True:
             for serverid in self.save_file["Servers"]:
@@ -479,7 +479,7 @@ class Parrot:
             await asyncio.sleep(1200 - ((time.time() - start_time) % 1200)) # 20 minutes
 
     def add_server(self, server):
-        """Adds the server to the file if it isn't already in it"""
+        """Adds the server to the file if it isn't already in it."""
         if server.id not in self.save_file["Servers"]:
             self.save_file["Servers"][server.id] = copy.deepcopy(SERVER_DEFAULT)
             self.save_file["Servers"][server.id]["Parrot"]["Appetite"] = round(random.normalvariate(50, 6))
@@ -490,18 +490,17 @@ class Parrot:
         return
 
     def parrot_perched_on(self, server):
-        """Returns the user ID of whoever Parrot is perched on
+        """Returns the user ID of whoever Parrot is perched on.
 
-        This is for Heist.py to use for heist boost"""
+        This is for Heist.py to use for heist boost."""
         self.add_server(server) # make sure the server is in the data file
         return self.save_file["Servers"][server.id]["Parrot"]["UserWith"]
 
     def heist_boost_available(self, server, user, availability=True):
-        """Returns whether the user has a Heist boost available
+        """Returns whether the user has a Heist boost available.
+        Optionally set availability to False to set the user's HeistBoostAvailable to False.
 
-        Optionally set availability to False to set the user's HeistBoostAvailable to False
-
-        This is for Heist.py to use for heist boost"""
+        This is for Heist.py to use for heist boost."""
         self.add_server(server) # make sure the server is in the data file
         if availability is False:
             self.save_file["Servers"][server.id]["Feeders"][user.id]["HeistBoostAvailable"] = False
@@ -513,7 +512,7 @@ class Parrot:
         self.loop_task2.cancel()
 
 def dir_check():
-    """Creates a folder and save file for the cog if they don't exist"""
+    """Creates a folder and save file for the cog if they don't exist."""
     if not os.path.exists("data/KeaneCogs/parrot"):
         print("Creating data/KeaneCogs/parrot folder...")
         os.makedirs("data/KeaneCogs/parrot")
@@ -523,6 +522,6 @@ def dir_check():
         dataIO.save_json(SAVE_FILEPATH, {"Servers": {}, "Global": {"StarveTime": 86400}})
 
 def setup(bot):
-    """Creates a Parrot object"""
+    """Creates a Parrot object."""
     dir_check()
     bot.add_cog(Parrot(bot))
