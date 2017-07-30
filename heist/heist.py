@@ -891,7 +891,7 @@ class Heist:
             self.run_death(settings, user)
 
     def heist_target(self, settings, crew):
-        targets = [target for target in settings["Targets"] if settings["Targets"][target]["Crew"] > crew]
+        targets = [target for target in settings["Targets"] if settings["Targets"][target]["Crew"] >= crew]
 
         def key_func(target):
             return settings["Targets"][target]["Success"] * settings["Targets"][target]["Vault"]
