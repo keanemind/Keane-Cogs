@@ -891,11 +891,20 @@ class Heist:
             self.run_death(settings, user)
 
     def heist_target(self, settings, crew):
-        groups = sorted([(x, y["Crew"]) for x, y in settings["Targets"].items()], key=itemgetter(1))
-        crew_sizes = [x[1] for x in groups]
-        breakpoints = [x for x in crew_sizes if x != max(crew_sizes)]
-        targets = [x[0] for x in groups]
-        return targets[bisect.bisect_right(breakpoints, crew)]
+        targets = [target for target in settings["Targets"] if settings["Targets"][target]["Crew"] > crew]
+
+        def key_func(target):
+            return settings["Targets"][target]["Success"] * settings["Targets"][target]["Vault"]
+
+        def key_func2(target):
+            return settings["Targets"][target]["Crew"]
+
+        if targets:
+            return max(targets, key=key_func)
+        else:
+            # return target with the highest max_crew
+            targets = list(settings["Targets"])
+            return max(targets, key=key_func2)
 
     def run_death(self, settings, user):
         settings["Players"][user.id]["Criminal Level"] = 0
