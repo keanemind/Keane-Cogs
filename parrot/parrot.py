@@ -529,8 +529,7 @@ class Parrot:
         actual_start_time = Parrot.start_time + (self.starve_time * 0.2)
         time_since_started = time.time() - actual_start_time
         time_since_last_check = time_since_started % self.starve_time
-        time_until_next_check = self.starve_time - time_since_last_check
-        if time_until_next_check / self.starve_time <= 0.04:
+        if time_since_last_check / self.starve_time >= 0.8:
             message = ("You have unloaded Parrot very near the next starve check. "
                         "This means that a starve check that was about to happen will "
                         "not happen. You should consider using `{}parrot checknow` "
