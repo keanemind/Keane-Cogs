@@ -59,7 +59,7 @@ class Parrot:
         # check if user has a bank account to withdraw credits from
         if not bank.account_exists(ctx.message.author):
             return await self.bot.say("You need to have a bank account with credits to feed me. "
-                                      "Use \"{}bank register\" to open one.".format(ctx.prefix))
+                                      "Use `{}bank register` to open one.".format(ctx.prefix))
 
         # feeding negative pellets is not allowed
         if amount <= 0:
@@ -145,14 +145,14 @@ class Parrot:
 
         if parrot["Fullness"] / parrot["Appetite"] >= 0.5:
             description_str = ("Parrot has been fed enough food that he won't starve for now. "
-                               "Use \"{}help parrot\" for more information.".format(ctx.prefix))
+                               "Use `{}help parrot` for more information.".format(ctx.prefix))
             time_until_starved_str = "until fullness resets:\n"
             if parrot["StarvedLoops"] > 0:
                 status_str = "recovering"
         else:
             description_str = ("If Parrot is not fed enough to be half full by the time "
                                "the timer reaches 0, he will enter the next phase of "
-                               "starvation. Use \"{}help parrot\" for more information.".format(ctx.prefix))
+                               "starvation. Use `{}help parrot` for more information.".format(ctx.prefix))
 
         actual_start_time = Parrot.start_time + (self.starve_time * 0.2)
         time_since_started = time.time() - actual_start_time
@@ -251,7 +251,7 @@ class Parrot:
         error_msg = ""
         if ctx.message.author.id != parrot["UserWith"]:
             error_msg = ("Parrot needs to be perched on you to use this command. "
-                         "Use \"{}help parrot\" for more information.".format(ctx.prefix))
+                         "Use `{}help parrot` for more information.".format(ctx.prefix))
         elif not feeders[ctx.message.author.id]["StealAvailable"]:
             error_msg = ("You have already used steal. You must wait until "
                          "Parrot's fullness resets, and be perched on by him again.")
@@ -308,7 +308,7 @@ class Parrot:
 
         if ctx.message.author.id != self.save_file["Servers"][server.id]["Parrot"]["UserWith"]: # NEW
             return await self.bot.say("Parrot needs to be perched on you to use this command. "
-                                      "Use \"{}help parrot\" for more information.".format(ctx.prefix)) # NEW
+                                      "Use `{}help parrot` for more information.".format(ctx.prefix)) # NEW
         if self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id]["AirhornUses"] >= 3: # NEW
             return await self.bot.say("You have already used steal 3 times. You must wait until "
                                       "Parrot's fullness resets, and be perched on by him again.") # NEW
