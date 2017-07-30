@@ -526,6 +526,19 @@ class Parrot:
         self.loop_task.cancel()
         self.loop_task2.cancel()
 
+        actual_start_time = Parrot.start_time + (self.starve_time * 0.2)
+        time_since_started = time.time() - actual_start_time
+        time_since_last_check = time_since_started % self.starve_time
+        time_until_next_check = self.starve_time - time_since_last_check
+        if time_until_next_check / self.starve_time <= 0.04:
+            message = ("You have unloaded Parrot very near the next starve check. "
+                        "This means that a starve check that was about to happen will "
+                        "not happen. You should consider using `{}parrot checknow` "
+                        "when Parrot is loaded again.".format(self.bot.settings.prefixes[0]))
+            ownerid = self.bot.settings.owner
+            owner = discord.utils.get(self.bot.get_all_members(), id=ownerid)
+            self.bot.loop.create_task(self.bot.send_message(owner, message))
+
 def dir_check():
     """Creates a folder and save file for the cog if they don't exist."""
     if not os.path.exists("data/KeaneCogs/parrot"):
