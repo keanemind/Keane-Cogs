@@ -120,88 +120,6 @@ class Parrot:
         if ctx.invoked_subcommand is None:
             await send_cmd_help(ctx)
 
-    @parrot.command(name="info", pass_context=True, no_pm=True)
-    async def parrot_info(self, ctx):
-        """Information about the parrot."""
-        server = ctx.message.server
-        self.add_server(server) # make sure the server is in the data file
-
-        parrot = self.save_file["Servers"][server.id]["Parrot"]
-
-        fullness_str = "{} out of {} pellets".format(parrot["Fullness"], parrot["Appetite"])
-        feed_cost_str = "{} credits per pellet".format(parrot["Cost"])
-        days_living_str = "{} days".format((parrot["LoopsAlive"] * self.starve_time) // 86400)
-
-        # status and time_until_starved
-        if parrot["StarvedLoops"] == 0:
-            status_str = "healthy"
-            time_until_starved_str = "until Parrot begins\nstarving: "
-        elif parrot["StarvedLoops"] == 1:
-            status_str = "starving"
-            time_until_starved_str = "until Parrot becomes\ndeathly hungry:\n"
-        else:
-            status_str = "deathbed\n(will die if not fed!)"
-            time_until_starved_str = "until Parrot dies of\nstarvation: "
-
-        if parrot["Fullness"] / parrot["Appetite"] >= 0.5:
-            description_str = ("Parrot has been fed enough food that he won't starve for now. "
-                               "Use `{}help parrot` for more information.".format(ctx.prefix))
-            time_until_starved_str = "until fullness resets:\n"
-            if parrot["StarvedLoops"] > 0:
-                status_str = "recovering"
-        else:
-            description_str = ("If Parrot is not fed enough to be half full by the time "
-                               "the timer reaches 0, he will enter the next phase of "
-                               "starvation. Use `{}help parrot` for more information.".format(ctx.prefix))
-
-        actual_start_time = Parrot.start_time + (self.starve_time * 0.2)
-        time_since_started = time.time() - actual_start_time
-        time_since_last_check = time_since_started % self.starve_time
-        if parrot["LoopsAlive"] == 0:
-            formatted_time = datetime.timedelta(seconds=round((self.starve_time * 2) - time_since_last_check))
-        else:
-            formatted_time = datetime.timedelta(seconds=round(self.starve_time - time_since_last_check))
-        time_until_starved_str += str(formatted_time)
-        # say you're checking every 60 seconds instead of self.starve_time seconds
-        # (Parrot.start_time + (60 * 0.2)) is the actual start time of starve_loop
-        # (time.time() - actual_start_time) is how long it's been since starve_loop started
-        # (time_since_started % 60) resets to 0 every time it hits a multiple of 60
-        # (60 - time_since_started_capped_at_60) is how long is left until the check runs again
-        # if Parrot has been alive 0 days, it's (60*2 - time_since_started_capped_at_60)
-        # datetime.timedelta formats this number of seconds into 0:00:00
-
-        if parrot["UserWith"]:
-            userwith_str = (await self.bot.get_user_info(parrot["UserWith"])).mention
-        else:
-            userwith_str = "nobody"
-
-        embed = discord.Embed(color=discord.Color.teal(), description=description_str)
-        embed.title = "Parrot Information"
-        embed.timestamp = datetime.datetime.utcfromtimestamp(time.time())
-        embed.set_thumbnail(url="{}".format(self.bot.user.avatar_url if self.bot.user.avatar_url
-                                            else self.bot.user.default_avatar_url))
-        embed.set_footer(text="Made by Keane")
-        embed.add_field(name="Fullness", value=fullness_str)
-        embed.add_field(name="Cost to feed", value=feed_cost_str)
-        embed.add_field(name="Age", value=days_living_str)
-        embed.add_field(name="Status", value=status_str)
-        embed.add_field(name="Perched on", value=userwith_str)
-        embed.add_field(name="Countdown", value=time_until_starved_str)
-        return await self.bot.say(embed=embed)
-
-    @parrot.command(name="setcost", pass_context=True, no_pm=True)
-    @checks.admin_or_permissions(manage_server=True)
-    async def parrot_set_cost(self, ctx, cost: int):
-        """Change how much it costs to feed the parrot 1 pellet."""
-        server = ctx.message.server
-        self.add_server(server) # make sure the server is in the data file
-        if cost >= 0:
-            self.save_file["Servers"][server.id]["Parrot"]["Cost"] = cost
-            dataIO.save_json(SAVE_FILEPATH, self.save_file)
-            return await self.bot.say("Set cost of feeding to {} credits per pellet.".format(cost))
-        else:
-            return await self.bot.say("Cost must be at least 0.")
-
     @parrot.command(name="setstarvetime", pass_context=True) # no_pm=False
     @checks.is_owner()
     async def parrot_set_starve_time(self, ctx, seconds: int):
@@ -235,6 +153,19 @@ class Parrot:
         await self.starve_check()
         return await self.bot.send_message(ctx.message.author,
                                            "starve_check was executed.")
+
+    @parrot.command(name="setcost", pass_context=True, no_pm=True)
+    @checks.admin_or_permissions(manage_server=True)
+    async def parrot_set_cost(self, ctx, cost: int):
+        """Change how much it costs to feed the parrot 1 pellet."""
+        server = ctx.message.server
+        self.add_server(server) # make sure the server is in the data file
+        if cost >= 0:
+            self.save_file["Servers"][server.id]["Parrot"]["Cost"] = cost
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
+            return await self.bot.say("Set cost of feeding to {} credits per pellet.".format(cost))
+        else:
+            return await self.bot.say("Cost must be at least 0.")
 
     @parrot.command(name="steal", pass_context=True, no_pm=True)
     async def parrot_steal(self, ctx, target: discord.Member):
@@ -376,6 +307,75 @@ class Parrot:
 
         self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id]["AirhornUses"] += 1 # NEW
         dataIO.save_json(SAVE_FILEPATH, self.save_file) # NEW
+
+    @parrot.command(name="info", pass_context=True, no_pm=True)
+    async def parrot_info(self, ctx):
+        """Information about the parrot."""
+        server = ctx.message.server
+        self.add_server(server) # make sure the server is in the data file
+
+        parrot = self.save_file["Servers"][server.id]["Parrot"]
+
+        fullness_str = "{} out of {} pellets".format(parrot["Fullness"], parrot["Appetite"])
+        feed_cost_str = "{} credits per pellet".format(parrot["Cost"])
+        days_living_str = "{} days".format((parrot["LoopsAlive"] * self.starve_time) // 86400)
+
+        # status and time_until_starved
+        if parrot["StarvedLoops"] == 0:
+            status_str = "healthy"
+            time_until_starved_str = "until Parrot begins\nstarving: "
+        elif parrot["StarvedLoops"] == 1:
+            status_str = "starving"
+            time_until_starved_str = "until Parrot becomes\ndeathly hungry:\n"
+        else:
+            status_str = "deathbed\n(will die if not fed!)"
+            time_until_starved_str = "until Parrot dies of\nstarvation: "
+
+        if parrot["Fullness"] / parrot["Appetite"] >= 0.5:
+            description_str = ("Parrot has been fed enough food that he won't starve for now. "
+                               "Use `{}help parrot` for more information.".format(ctx.prefix))
+            time_until_starved_str = "until fullness resets:\n"
+            if parrot["StarvedLoops"] > 0:
+                status_str = "recovering"
+        else:
+            description_str = ("If Parrot is not fed enough to be half full by the time "
+                               "the timer reaches 0, he will enter the next phase of "
+                               "starvation. Use `{}help parrot` for more information.".format(ctx.prefix))
+
+        actual_start_time = Parrot.start_time + (self.starve_time * 0.2)
+        time_since_started = time.time() - actual_start_time
+        time_since_last_check = time_since_started % self.starve_time
+        if parrot["LoopsAlive"] == 0:
+            formatted_time = datetime.timedelta(seconds=round((self.starve_time * 2) - time_since_last_check))
+        else:
+            formatted_time = datetime.timedelta(seconds=round(self.starve_time - time_since_last_check))
+        time_until_starved_str += str(formatted_time)
+        # say you're checking every 60 seconds instead of self.starve_time seconds
+        # (Parrot.start_time + (60 * 0.2)) is the actual start time of starve_loop
+        # (time.time() - actual_start_time) is how long it's been since starve_loop started
+        # (time_since_started % 60) resets to 0 every time it hits a multiple of 60
+        # (60 - time_since_started_capped_at_60) is how long is left until the check runs again
+        # if Parrot has been alive 0 days, it's (60*2 - time_since_started_capped_at_60)
+        # datetime.timedelta formats this number of seconds into 0:00:00
+
+        if parrot["UserWith"]:
+            userwith_str = (await self.bot.get_user_info(parrot["UserWith"])).mention
+        else:
+            userwith_str = "nobody"
+
+        embed = discord.Embed(color=discord.Color.teal(), description=description_str)
+        embed.title = "Parrot Information"
+        embed.timestamp = datetime.datetime.utcfromtimestamp(time.time())
+        embed.set_thumbnail(url="{}".format(self.bot.user.avatar_url if self.bot.user.avatar_url
+                                            else self.bot.user.default_avatar_url))
+        embed.set_footer(text="Made by Keane")
+        embed.add_field(name="Fullness", value=fullness_str)
+        embed.add_field(name="Cost to feed", value=feed_cost_str)
+        embed.add_field(name="Age", value=days_living_str)
+        embed.add_field(name="Status", value=status_str)
+        embed.add_field(name="Perched on", value=userwith_str)
+        embed.add_field(name="Countdown", value=time_until_starved_str)
+        return await self.bot.say(embed=embed)
 
     async def starve_loop(self):
         """Runs in a loop to periodically check whether Parrot has starved or not."""
