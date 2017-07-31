@@ -392,9 +392,10 @@ class Parrot:
             else:
                 name = feeder.display_name
             output += name
-            output += " " * (23 - len(name)) # output is 23 characters now
             pellets_str = str(feeders[feederid]["PelletsFed"])
-            output += " " * (3 - (len(pellets_str)))
+            # len(name) cannot be > 22 and len(pellets_str) cannot be > 3
+            # this means there will be at least one space added
+            output += " " * (26 - len(pellets_str) - len(name))
             output += pellets_str
             output += "\n"
         
