@@ -359,7 +359,7 @@ class Parrot:
         # datetime.timedelta formats this number of seconds into 0:00:00
 
         if parrot["UserWith"]:
-            userwith_str = (await self.bot.get_user_info(parrot["UserWith"])).mention
+            userwith_str = server.get_member(parrot["UserWith"]).mention
         else:
             userwith_str = "nobody"
 
