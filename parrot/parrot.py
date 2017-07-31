@@ -423,7 +423,7 @@ class Parrot:
 
             output += " " * (26 - len(name) - end_len)
             # append the end
-            output += " " + pellets_str + "/"
+            output += " " + pellets_str + "|"
             output += " " * (max_chance_len - len(chance_str))
             output += chance_str + "%"
             output += "\n"
