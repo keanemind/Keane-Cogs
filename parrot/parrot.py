@@ -531,9 +531,9 @@ class Parrot:
         time_since_last_check = time_since_started % self.starve_time
         if time_since_last_check / self.starve_time >= 0.8:
             message = ("You have unloaded Parrot very near the next starve check. "
-                        "This means that a starve check that was about to happen will "
-                        "not happen. You should consider using `{}parrot checknow` "
-                        "when Parrot is loaded again.".format(self.bot.settings.prefixes[0]))
+                       "This means that a starve check that was about to happen will "
+                       "not happen. You should consider using `{}parrot checknow` "
+                       "when Parrot is loaded again.".format(self.bot.settings.prefixes[0]))
             ownerid = self.bot.settings.owner
             owner = discord.utils.get(self.bot.get_all_members(), id=ownerid)
             self.bot.loop.create_task(self.bot.send_message(owner, message))
