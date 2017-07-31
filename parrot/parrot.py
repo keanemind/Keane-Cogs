@@ -377,6 +377,30 @@ class Parrot:
         embed.add_field(name="Countdown", value=time_until_starved_str)
         return await self.bot.say(embed=embed)
 
+    @parrot.command(name="feeders", pass_context=True, no_pm=True)
+    async def parrot_feeders(self, ctx):
+        server = ctx.message.server
+        output = "```py\n"
+        feeders = self.save_file["Servers"][server.id]["Feeders"]
+        idlist = sorted(list(feeders),
+                        key=(lambda idnum: feeders[idnum]["PelletsFed"]),
+                        reverse=True)
+        for feederid in idlist:
+            feeder = server.get_member(feederid)
+            if len(feeder.display_name) > 22:
+                name = feeder.display_name[:19] + "..."
+            else:
+                name = feeder.display_name
+            output += name
+            output += " " * (23 - len(name)) # output is 23 characters now
+            pellets_str = str(feeders[feederid]["PelletsFed"])
+            output += " " * (3 - (len(pellets_str)))
+            output += pellets_str
+            output += "\n"
+        
+        output += "```"
+        return await self.bot.say(output)
+
     async def starve_loop(self):
         """Runs in a loop to periodically check whether Parrot has starved or not."""
         # check if starved. if starved, leave and wipe data
