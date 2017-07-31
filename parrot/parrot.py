@@ -379,26 +379,55 @@ class Parrot:
 
     @parrot.command(name="feeders", pass_context=True, no_pm=True)
     async def parrot_feeders(self, ctx):
+        """Display a list of people who have fed Parrot in the current
+        appetite loop, with the number of pellets they have fed and
+        the percent chance they have of being perched on."""
         server = ctx.message.server
         output = "```py\n"
         feeders = self.save_file["Servers"][server.id]["Feeders"]
+        parrot = self.save_file["Servers"][server.id]["Parrot"]
+
+        if not feeders:
+            return await self.bot.say("```Nobody has fed Parrot yet.```")
+
         idlist = sorted(list(feeders),
                         key=(lambda idnum: feeders[idnum]["PelletsFed"]),
                         reverse=True)
+
+        max_chance = (feeders[idlist[0]]["PelletsFed"] / parrot["Appetite"]) * 100
+        max_chance_len = len(str(round(max_chance)))
+
+        max_pellets = feeders[idlist[0]]["PelletsFed"]
+        max_pellets_len = len(str(max_pellets))
+
+        # example: " 155/100%"
+        max_end_len = 1 + max_pellets_len + 1 + max_chance_len + 1
+
         for feederid in idlist:
             feeder = server.get_member(feederid)
-            if len(feeder.display_name) > 22:
-                name = feeder.display_name[:19] + "..."
+
+            chance = (feeders[feederid]["PelletsFed"] / parrot["Appetite"]) * 100
+            chance_str = str(round(chance))
+
+            if len(feeder.display_name) > 26 - max_end_len:
+                # 26 - 3 to leave room for the ellipsis
+                name = feeder.display_name[:23 - max_end_len] + "..."
             else:
                 name = feeder.display_name
+
             output += name
             pellets_str = str(feeders[feederid]["PelletsFed"])
-            # len(name) cannot be > 22 and len(pellets_str) cannot be > 3
-            # this means there will be at least one space added
-            output += " " * (26 - len(pellets_str) - len(name))
-            output += pellets_str
+
+            # example: " 1/ 1%"
+            end_len = 1 + len(pellets_str) + 1 + max_chance_len + 1
+
+            output += " " * (26 - len(name) - end_len)
+            # append the end
+            output += " " + pellets_str + "/"
+            output += " " * (max_chance_len - len(chance_str))
+            output += chance_str + "%"
             output += "\n"
-        
+
         output += "```"
         return await self.bot.say(output)
 
