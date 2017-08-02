@@ -81,8 +81,8 @@ class Parrot:
         # confirmation prompt
         await self.bot.say("You are about to spend {} credits to feed me {} pellets. "
                            "Reply \"yes\" to confirm.".format(usercost, amount))
-        response = await self.bot.wait_for_message(author=ctx.message.author)
-        if response.content.lower().strip() != "yes":
+        response = await self.bot.wait_for_message(timeout=15, author=ctx.message.author)
+        if response is None or response.content.lower().strip() != "yes":
             return await self.bot.say("Okay then, but don't let me starve!")
 
         # deduct usercost from their credits account
@@ -531,8 +531,8 @@ class Parrot:
         If Parrot has starved, leave the server. If he has survived,
         move on to the next loop."""
         for serverid in list(self.save_file["Servers"]): # generate a list because servers might
-                                                            # be removed from the dict while iterating
-            parrot = self.save_file["Servers"][serverid]["Parrot"] # maybe unnecessary
+                                                         # be removed from the dict while iterating
+            parrot = self.save_file["Servers"][serverid]["Parrot"]
 
             # don't check on the first loop to give new servers a chance
             # in case they got added at an unlucky time (right before the check happens)
