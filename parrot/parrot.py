@@ -39,10 +39,11 @@ class Parrot:
         self.save_file = dataIO.load_json(SAVE_FILEPATH)
         self.bot = bot
 
+        self.update_version()
+
         self.checktime = datetime.datetime.utcnow() # dummy value
         self.update_checktime(False) # change checktime to what it should be
                                      # without causing a new warning
-
         self.starve_task = bot.loop.create_task(self.starve_loop()) # remember to change __unload()
         self.warning_task = bot.loop.create_task(self.warning_loop())
         self.perch_task = bot.loop.create_task(self.perch_loop())
@@ -603,6 +604,23 @@ class Parrot:
                     self.save_file["Servers"][serverid]["Parrot"]["WarnedYet"] = False
                 dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
+    def update_version(self):
+        """Update the save file if necessary."""
+        if "Version" not in self.save_file["Global"]: # if version == 1
+            for serverid in self.save_file["Servers"]:
+                parrot = self.save_file["Servers"][serverid]["Parrot"]
+                starvetime = self.save_file["Global"]["StarveTime"]
+
+                parrot["HoursAlive"] = round((starvetime * parrot["LoopsAlive"]) / 3600)
+                parrot["ChecksAlive"] = parrot["LoopsAlive"]
+                del parrot["LoopsAlive"]
+                parrot["WarnedYet"] = False
+
+            self.save_file["Global"]["StarveTime"] = [5, 0]
+            self.save_file["Global"]["Version"] = "2"
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
+            return
+
     def parrot_perched_on(self, server):
         """Returns the user ID of whoever Parrot is perched on.
 
@@ -634,7 +652,7 @@ def dir_check():
 
     if not dataIO.is_valid_json(SAVE_FILEPATH):
         print("Creating default parrot.json...")
-        dataIO.save_json(SAVE_FILEPATH, {"Servers": {}, "Global": {"StarveTime": [5, 0]}})
+        dataIO.save_json(SAVE_FILEPATH, {"Servers": {}, "Global": {"StarveTime": [5, 0], "Version": "2"}})
 
 def setup(bot):
     """Creates a Parrot object."""
