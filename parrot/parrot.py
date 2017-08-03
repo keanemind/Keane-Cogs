@@ -3,7 +3,6 @@ import os
 import random
 import asyncio
 import copy
-import time
 import datetime
 
 import discord
@@ -23,7 +22,7 @@ SERVER_DEFAULT = {"Parrot":{"Appetite":0, # the maximum number of pellets Parrot
                                           # (reset by starve_check)
                             "Cost":5, # the cost of feeding Parrot 1 pellet
                             "StarvedLoops":0, # tracks what phase of starvation Parrot is in
-                            "WarnedYet":False # whether the server has been warned for the 
+                            "WarnedYet":False # whether the server has been warned for the
                                               # current self.checktime or not
                            },
                   "Feeders":{} # contains user IDs as keys and dicts as values
@@ -41,7 +40,7 @@ class Parrot:
         self.bot = bot
 
         self.checktime = datetime.datetime.utcnow() # dummy value
-        self.update_checktime(False) # change checktime to what it should be 
+        self.update_checktime(False) # change checktime to what it should be
                                      # without causing a new warning
 
         self.starve_task = bot.loop.create_task(self.starve_loop()) # remember to change __unload()
@@ -523,11 +522,9 @@ class Parrot:
 
                 if parrot["UserWith"]:
                     userwith = parrot["UserWith"] # this is an ID number
-                    if "HeistBoostAvailable" not in feeders[userwith]:
+                    if "AirhornUses" not in feeders[userwith]:
                         feeders[userwith]["HeistBoostAvailable"] = True
-                    if "StealAvailable" not in feeders[userwith]: # maybe unnecessary
                         feeders[userwith]["StealAvailable"] = True
-                    if "AirhornUses" not in feeders[userwith]: # maybe unnecessary
                         feeders[userwith]["AirhornUses"] = 0
 
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
