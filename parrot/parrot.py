@@ -582,8 +582,6 @@ class Parrot:
             print("{} New server \"{}\" found and added to Parrot data file!"
                   .format(datetime.datetime.now(), server.name))
 
-        return
-
     def update_checktime(self, warn=True):
         """Update self.checktime for the latest StarveTime.
         If StarveTime has already passed today, self.checktime
