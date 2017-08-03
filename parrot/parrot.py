@@ -363,7 +363,7 @@ class Parrot:
 
         embed = discord.Embed(color=discord.Color.teal(), description=description_str)
         embed.title = "Parrot Information"
-        embed.timestamp = datetime.datetime.utcfromtimestamp(time.time())
+        embed.timestamp = datetime.datetime.utcfromtimestamp(os.path.getmtime(os.path.abspath(__file__)))
         embed.set_thumbnail(url="{}".format(self.bot.user.avatar_url if self.bot.user.avatar_url
                                             else self.bot.user.default_avatar_url))
         embed.set_footer(text="Made by Keane")
