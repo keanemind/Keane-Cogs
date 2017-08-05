@@ -891,20 +891,22 @@ class Heist:
             self.run_death(settings, user)
 
     def heist_target(self, settings, crew):
-        targets = [target for target in settings["Targets"] if settings["Targets"][target]["Crew"] >= crew]
+        targets = [target for target in settings["Targets"]
+                   if settings["Targets"][target]["Crew"] >= crew]
 
-        def key_func(target):
-            return settings["Targets"][target]["Success"] * settings["Targets"][target]["Vault"]
+        def earnings(target):
+            return (settings["Targets"][target]["Success"]
+                    * settings["Targets"][target]["Vault"])
 
-        def key_func2(target):
+        def max_crew(target):
             return settings["Targets"][target]["Crew"]
 
         if targets:
-            return max(targets, key=key_func)
+            return max(targets, key=earnings)
         else:
             # return target with the highest max_crew
             targets = list(settings["Targets"])
-            return max(targets, key=key_func2)
+            return max(targets, key=max_crew)
 
     def run_death(self, settings, user):
         settings["Players"][user.id]["Criminal Level"] = 0
