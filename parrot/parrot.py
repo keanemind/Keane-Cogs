@@ -11,23 +11,34 @@ from __main__ import send_cmd_help
 from .utils import checks
 from .utils.dataIO import dataIO
 
-SERVER_DEFAULT = {"Parrot":{"Appetite":0, # the maximum number of pellets Parrot can be fed
-                                          # (reset by starve_check)
-                            "ChecksAlive":0, # the number of starve_checks Parrot survived
-                            "HoursAlive":0, # the number of hours Parrot has been alive in
-                                            # the server
-                            "UserWith":"", # ID of user Parrot is perched on
-                                           # (reset by starve_check)
-                            "Fullness":0, # the number of pellets Parrot has in his belly
-                                          # (reset by starve_check)
-                            "Cost":5, # the cost of feeding Parrot 1 pellet
-                            "StarvedLoops":0, # tracks what phase of starvation Parrot is in
-                            "WarnedYet":False # whether the server has been warned for the
-                                              # current self.checktime or not
-                           },
-                  "Feeders":{} # contains user IDs as keys and dicts as values
-                               # (reset by starve_check)
-                 }
+SAVE_DEFAULT = {
+    "Servers": {},
+    "Global": {
+        "StarveTime": [5, 0], # the hour and minute of the day that starve_check runs
+        "Version": "2"
+        }
+    }
+
+SERVER_DEFAULT = {
+    "Parrot": {
+        "Appetite": 0, # max number of pellets Parrot can be fed (reset by starve_check)
+
+        "ChecksAlive": 0, # number of starve_checks survived
+
+        "HoursAlive": 0, # number of hours Parrot has been alive in the server
+
+        "UserWith": "", # ID of user Parrot is perched on (reset by starve_check)
+
+        "Fullness": 0, # number of pellets Parrot has in his belly (reset by starve_check)
+
+        "Cost": 5, # cost of feeding Parrot 1 pellet
+
+        "StarvedLoops": 0, # phase of starvation Parrot is in
+
+        "WarnedYet": False # whether the server has been warned for the current self.checktime or not
+        },
+    "Feeders": {} # contains user IDs as keys and dicts as values (reset by starve_check)
+    }
 
 SAVE_FILEPATH = "data/KeaneCogs/parrot/parrot.json"
 
@@ -75,7 +86,7 @@ class Parrot:
 
         # make sure parrot doesn't get overfed
         if parrot["Fullness"] + amount > parrot["Appetite"]:
-            amount -= parrot["Fullness"] + amount - parrot["Appetite"]
+            amount = parrot["Appetite"] - parrot["Fullness"]
             await self.bot.say("I don't want to be too full. I'll only eat {} pellets, "
                                "and you can keep the rest.".format(amount))
 
@@ -473,7 +484,8 @@ class Parrot:
                         else:
                             await self.bot.send_message(
                                 self.bot.get_server(serverid),
-                                "*I'm going to* ***DIE*** *of starvation very soon if I don't get fed!*")
+                                "*I'm going to* ***DIE*** *of starvation very "
+                                "soon if I don't get fed!*")
                         parrot["WarnedYet"] = True
                 dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
@@ -500,7 +512,8 @@ class Parrot:
                 if datetime.datetime.utcnow().minute == 0:
                     parrot["HoursAlive"] += 1
 
-                weights = [(feeders[feederid]["PelletsFed"] / parrot["Appetite"]) * 100 for feederid in feeders]
+                weights = [(feeders[feederid]["PelletsFed"] / parrot["Appetite"])
+                           * 100 for feederid in feeders]
                 population = list(feeders)
                 weights.append(100 - sum(weights))
                 population.append("")
@@ -652,7 +665,7 @@ def dir_check():
 
     if not dataIO.is_valid_json(SAVE_FILEPATH):
         print("Creating default parrot.json...")
-        dataIO.save_json(SAVE_FILEPATH, {"Servers": {}, "Global": {"StarveTime": [5, 0], "Version": "2"}})
+        dataIO.save_json(SAVE_FILEPATH, SAVE_DEFAULT)
 
 def setup(bot):
     """Creates a Parrot object."""
