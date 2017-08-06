@@ -180,13 +180,13 @@ class Quiz:
             rank = 1
             for playerid in idlist[:5]:
                 player = server.get_member(playerid)
-                if len(player.display_name) > 26 - end_len:
-                    name = player.display_name[:23 - end_len] + "..."
+                if len(player.display_name) > 24 - end_len:
+                    name = player.display_name[:21 - end_len] + "..."
                 else:
                     name = player.display_name
                 scoreboard += str(rank) + " " + name
                 score_str = str(serverinfo["Players"][playerid])
-                scoreboard += " " * (25 - len(str(rank)) - len(name) - len(score_str))
+                scoreboard += " " * (24 - len(name) - len(score_str))
                 scoreboard += score_str + "\n"
                 rank += 1
             scoreboard += "```"
@@ -242,11 +242,13 @@ class Quiz:
                 no_account = True
 
             rank += 1
+
         if not no_account:
             leaderboard += "```"
         else:
             leaderboard += ("* because you do not have a bank account, "
                             "you did not get to keep the credits you won.```\n")
+
         await self.bot.send_message(server, "Credits earned:\n" + leaderboard)
         self.playing_servers.pop(server.id)
 
