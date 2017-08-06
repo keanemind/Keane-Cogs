@@ -216,32 +216,31 @@ class Quiz:
         no_account = False
         for playerid in idlist:
             player = server.get_member(playerid)
-            if bank.account_exists(player): # how does this know what server it's called in???
+            account_exists = bank.account_exists(player)
+            if account_exists: # how does this know what server it's called in???
                 if len(player.display_name) > 25 - rank_len - end_len:
                     name = player.display_name[:22 - rank_len - end_len] + "..."
                 else:
                     name = player.display_name
-                leaderboard += str(rank)
-                leaderboard += " " * (1 + rank_len - len(str(rank)))
-                leaderboard += name
-                creds = round(.0002 * (serverinfo["Players"][playerid] / 100)**2.9)
-                creds_str = str(creds)
-                leaderboard += " " * (26 - rank_len - 1 - len(name) - len(creds_str))
-                leaderboard += creds_str + "\n"
-                bank.deposit_credits(player, creds)
             else:
                 if len(player.display_name) > 24 - rank_len - end_len:
                     name = player.display_name[:21 - rank_len - end_len] + "...*"
                 else:
                     name = player.display_name + "*"
-                leaderboard += str(rank) 
-                leaderboard += " " * (1 + rank_len - len(str(rank)))
-                leaderboard += name
-                creds = round(.0002 * (serverinfo["Players"][playerid] / 100)**2.9)
-                creds_str = str(creds)
-                leaderboard += " " * (26 - rank_len - 1 - len(name) - len(creds_str))
-                leaderboard += creds_str + "\n"
+
+            leaderboard += str(rank)
+            leaderboard += " " * (1 + rank_len - len(str(rank)))
+            leaderboard += name
+            creds = round(.0002 * (serverinfo["Players"][playerid] / 100)**2.9)
+            creds_str = str(creds)
+            leaderboard += " " * (26 - rank_len - 1 - len(name) - len(creds_str))
+            leaderboard += creds_str + "\n"
+
+            if account_exists:
+                bank.deposit_credits(player, creds)
+            else:
                 no_account = True
+
             rank += 1
         if not no_account:
             leaderboard += "```"
