@@ -108,17 +108,18 @@ class Quiz:
         # Introduction
         intro = ("Welcome to the quiz game!\n"
                  "Remember to answer correctly as quickly as you can. "
-                 "You have 10s per question.\n"
+                 "You have 10 seconds per question.\n"
                  "The game will begin shortly.")
         await self.bot.send_message(server, intro)
         await asyncio.sleep(4)
 
         # Question and Answer
         for index, dictionary in enumerate(response["results"]):
-            question = "**" + html.unescape(dictionary["question"]) + "**\n"
             answers = [dictionary["correct_answer"]] + dictionary["incorrect_answers"]
 
             # Display question and countdown
+            question = "**" + html.unescape(dictionary["question"]) + "**\n"
+
             if len(answers) == 2: # true/false question
                 answers = ["True", "False", "", ""]
             else:
@@ -143,23 +144,21 @@ class Quiz:
                 await self.bot.add_reaction(message, numbers[i])
 
             # Organize answers
+            user_answers = serverinfo["Answers"] # snapshot serverinfo["Answers"] at this point in time
+                                                 # to ignore new answers that are added to it
             answerdict = {["a", "b", "c", "d"][num]: answers[num] for num in range(4)}
-            print(answerdict)
-            print(serverinfo["Answers"])
 
             # Assign scores
-            for playerid in serverinfo["Answers"]:
-                choice = serverinfo["Answers"][playerid]["Choice"]
-                response_time = serverinfo["Answers"][playerid]["Time"]
-                if answerdict[choice] == dictionary["correct_answer"]:
+            for playerid in user_answers:
+                choice = user_answers[playerid]["Choice"]
+                response_time = user_answers[playerid]["Time"]
+                if answerdict[choice] == html.unescape(dictionary["correct_answer"]):
                     time_taken = response_time - start_time
                     if time_taken < 1:
                         serverinfo["Players"][playerid] += 1000 # need a time multiplier
                     else:
                         points = round(1000 * (1 - (time_taken / 20))) # the 20 is 2 * 10s (max answer time)
                         serverinfo["Players"][playerid] += points
-            # answers said after this time are still added to the Answers dictionary,
-            # but have no affect on scores or ranking and are effectively ignored
 
             # Find and display correct answer
             correct = ""
@@ -172,7 +171,7 @@ class Quiz:
                                         correct.upper() + ". " + answerdict[correct])
 
             # Display top 5 players and their points
-            scoreboard = "```py\n"
+            scoreboard = "```json\n"
             idlist = sorted(list(serverinfo["Players"]),
                             key=(lambda idnum: serverinfo["Players"][idnum]),
                             reverse=True)
@@ -201,28 +200,54 @@ class Quiz:
         # Ending and Results
         # non-linear credit earning .0002x^{2.9} where x is score/100
         # leaderboard with credits earned
-        bank = self.bot.get_cog("Economy").bank
-        leaderboard = "```py\n"
         idlist = sorted(list(serverinfo["Players"]),
                         key=(lambda idnum: serverinfo["Players"][idnum]),
                         reverse=True)
-        max_credits = round(serverinfo["Players"][idlist[0]] / 100)
-        end_len = len(str(max_credits)) + 1
+
+        winner = server.get_member(idlist[0])
+        await self.bot.send_message(server, "Game over! " + winner.mention + " won!")
+
+        bank = self.bot.get_cog("Economy").bank
+        leaderboard = "```json\n"
+        max_credits = round(.0002 * (serverinfo["Players"][idlist[0]] / 100)**2.9)
+        end_len = len(str(max_credits)) + 1 # the 1 is for a space between a max length name and the score
+        rank_len = len(str(len(serverinfo["Players"])))
         rank = 1
+        no_account = False
         for playerid in idlist:
             player = server.get_member(playerid)
-            if len(player.display_name) > 26 - end_len:
-                name = player.display_name[:23 - end_len] + "..."
+            if bank.account_exists(player): # how does this know what server it's called in???
+                if len(player.display_name) > 25 - rank_len - end_len:
+                    name = player.display_name[:22 - rank_len - end_len] + "..."
+                else:
+                    name = player.display_name
+                leaderboard += str(rank)
+                leaderboard += " " * (1 + rank_len - len(str(rank)))
+                leaderboard += name
+                creds = round(.0002 * (serverinfo["Players"][playerid] / 100)**2.9)
+                creds_str = str(creds)
+                leaderboard += " " * (26 - rank_len - 1 - len(name) - len(creds_str))
+                leaderboard += creds_str + "\n"
+                bank.deposit_credits(player, creds)
             else:
-                name = player.display_name
-            leaderboard += str(rank) + " " + name
-            creds = round(.0002 * (serverinfo["Players"][playerid] / 100)**2.9)
-            bank.deposit_credits(player, creds)
-            creds_str = str(creds)
-            leaderboard += " " * (25 - len(str(rank)) - len(name) - len(creds_str))
-            leaderboard += creds_str + "\n"
+                if len(player.display_name) > 24 - rank_len - end_len:
+                    name = player.display_name[:21 - rank_len - end_len] + "...*"
+                else:
+                    name = player.display_name + "*"
+                leaderboard += str(rank) 
+                leaderboard += " " * (1 + rank_len - len(str(rank)))
+                leaderboard += name
+                creds = round(.0002 * (serverinfo["Players"][playerid] / 100)**2.9)
+                creds_str = str(creds)
+                leaderboard += " " * (26 - rank_len - 1 - len(name) - len(creds_str))
+                leaderboard += creds_str + "\n"
+                no_account = True
             rank += 1
-        leaderboard += "```"
+        if not no_account:
+            leaderboard += "```"
+        else:
+            leaderboard += ("* because you do not have a bank account, "
+                            "you did not get to keep the credits you won.```\n")
         await self.bot.send_message(server, "Credits earned:\n" + leaderboard)
         self.playing_servers.pop(server.id)
 
@@ -248,9 +273,13 @@ class Quiz:
                     raise RuntimeError("Question retrieval unsuccessful. Response "
                                        "code from OTDB: {}".format(response_code))
                 elif response_code == 3:
+                    # Token expired. Obtain new one.
+                    print("Response code from OTDB: 3")
                     self.save_file["Servers"][server.id]["Token"] = ""
                     dataIO.save_json(SAVE_FILEPATH, self.save_file)
                 elif response_code == 4:
+                    # Token empty. Reset it.
+                    print("Response code from OTDB: 4")
                     await self.reset_token(server)
         raise RuntimeError("Failed to retrieve questions.")
 
