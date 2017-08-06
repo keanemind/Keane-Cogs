@@ -185,7 +185,7 @@ class Quiz:
         await self.end_game(server)
 
     async def end_game(self, server):
-        """End a quiz game."""
+        """Ends a quiz game."""
         # non-linear credit earning .0002x^{2.9} where x is score/100
         # leaderboard with credits earned
         serverinfo = self.playing_servers[server.id]
