@@ -51,9 +51,9 @@ class Quiz:
                                                "Players":{player.id:0},
                                                "Answers":{}
                                               }
-            return await self.bot.say(player.display_name + " is starting a quiz game! "
-                                      "It will start in 20 seconds. Use `{}quiz play` "
-                                      "to join.".format(ctx.prefix))
+            return await self.bot.say("{} is starting a quiz game! It will start "
+                                      "in 20 seconds. Use `{}quiz play` to join."
+                                      .format(player.display_name, ctx.prefix))
 
         serverinfo = self.playing_servers[server.id]
         since_start = (datetime.datetime.utcnow() - serverinfo["Start"]).total_seconds()
@@ -63,7 +63,7 @@ class Quiz:
             await self.bot.say("A quiz game is already underway.")
         else:
             serverinfo["Players"][player.id] = 0
-            await self.bot.say(player.display_name + " joined the game.")
+            await self.bot.say("{} joined the game.".format(player.display_name))
 
     async def start_loop(self):
         """Starts quiz games when the timeout period ends."""
@@ -118,7 +118,8 @@ class Quiz:
             answers = [dictionary["correct_answer"]] + dictionary["incorrect_answers"]
 
             # Display question and countdown
-            question = "**" + html.unescape(dictionary["question"]) + "**\n"
+            question = "```\n"
+            question += html.unescape(dictionary["question"]) + "\n"
 
             if len(answers) == 2: # true/false question
                 answers = ["True", "False", "", ""]
@@ -126,10 +127,11 @@ class Quiz:
                 answers = [html.unescape(answer) for answer in answers]
                 random.shuffle(answers)
 
-            question += "**A.** {}\n".format(answers[0])
-            question += "**B.** {}\n".format(answers[1])
-            question += "**C.** {}\n".format(answers[2])
-            question += "**D.** {}\n".format(answers[3])
+            question += "A. {}\n".format(answers[0])
+            question += "B. {}\n".format(answers[1])
+            question += "C. {}\n".format(answers[2])
+            question += "D. {}\n".format(answers[3])
+            question += "```"
 
             serverinfo["Answers"].clear() # clear the previous question's answers
             message = await self.bot.send_message(server, question)
@@ -167,45 +169,32 @@ class Quiz:
                     correct = letter
                     break
             assert answerdict[correct] == html.unescape(dictionary["correct_answer"])
-            await self.bot.send_message(server, "Correct answer: " +
-                                        correct.upper() + ". " + answerdict[correct])
+            await self.bot.send_message(server, "Correct answer:```{}. {}```"
+                                        .format(correct.upper(), answerdict[correct]))
 
             # Display top 5 players and their points
-            scoreboard = "```json\n"
-            idlist = sorted(list(serverinfo["Players"]),
-                            key=(lambda idnum: serverinfo["Players"][idnum]),
-                            reverse=True)
-            max_score = serverinfo["Players"][idlist[0]]
-            end_len = len(str(max_score)) + 1
-            rank = 1
-            for playerid in idlist[:5]:
-                player = server.get_member(playerid)
-                if len(player.display_name) > 24 - end_len:
-                    name = player.display_name[:21 - end_len] + "..."
-                else:
-                    name = player.display_name
-                scoreboard += str(rank) + " " + name
-                score_str = str(serverinfo["Players"][playerid])
-                scoreboard += " " * (24 - len(name) - len(score_str))
-                scoreboard += score_str + "\n"
-                rank += 1
-            scoreboard += "```"
+            scoreboard = self.scoreboard(server)
             await self.bot.send_message(server, "Scoreboard:\n" + scoreboard)
-
             await asyncio.sleep(4)
+
             if index < 19:
                 await self.bot.send_message(server, "Next question...")
                 await asyncio.sleep(1)
 
         # Ending and Results
+        await self.end_game(server)
+
+    async def end_game(self, server):
+        """End a quiz game."""
         # non-linear credit earning .0002x^{2.9} where x is score/100
         # leaderboard with credits earned
+        serverinfo = self.playing_servers[server.id]
         idlist = sorted(list(serverinfo["Players"]),
                         key=(lambda idnum: serverinfo["Players"][idnum]),
                         reverse=True)
 
         winner = server.get_member(idlist[0])
-        await self.bot.send_message(server, "Game over! " + winner.mention + " won!")
+        await self.bot.send_message(server, "Game over! {} won!".format(winner.mention))
 
         bank = self.bot.get_cog("Economy").bank
         leaderboard = "```json\n"
@@ -216,8 +205,9 @@ class Quiz:
         no_account = False
         for playerid in idlist:
             player = server.get_member(playerid)
-            account_exists = bank.account_exists(player)
-            if account_exists: # how does this know what server it's called in???
+            account_exists = bank.account_exists(player) # how does this know what server it's called in???
+
+            if account_exists:
                 if len(player.display_name) > 25 - rank_len - end_len:
                     name = player.display_name[:22 - rank_len - end_len] + "..."
                 else:
@@ -251,6 +241,30 @@ class Quiz:
 
         await self.bot.send_message(server, "Credits earned:\n" + leaderboard)
         self.playing_servers.pop(server.id)
+
+    def scoreboard(self, server):
+        """Returns a scoreboard string to be sent to the text channel."""
+        serverinfo = self.playing_servers[server.id]
+        scoreboard = "```json\n"
+        idlist = sorted(list(serverinfo["Players"]),
+                        key=(lambda idnum: serverinfo["Players"][idnum]),
+                        reverse=True)
+        max_score = serverinfo["Players"][idlist[0]]
+        end_len = len(str(max_score)) + 1
+        rank = 1
+        for playerid in idlist[:5]:
+            player = server.get_member(playerid)
+            if len(player.display_name) > 24 - end_len:
+                name = player.display_name[:21 - end_len] + "..."
+            else:
+                name = player.display_name
+            scoreboard += str(rank) + " " + name
+            score_str = str(serverinfo["Players"][playerid])
+            scoreboard += " " * (24 - len(name) - len(score_str))
+            scoreboard += score_str + "\n"
+            rank += 1
+        scoreboard += "```"
+        return scoreboard
 
 # OpenTriviaDB API functions
     async def get_questions(self, server, category=None, difficulty=None):
