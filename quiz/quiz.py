@@ -351,8 +351,7 @@ class Quiz:
                 assert response_json["category_id"] == category
                 if response_json["category_question_count"]["total_question_count"] > 39:
                     return category
-                else:
-                    print("bad category: {}".format(category))
+
         raise RuntimeError("Failed to select a category.")
 
     async def category_name(self, idnum):
