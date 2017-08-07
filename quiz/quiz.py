@@ -97,7 +97,15 @@ class Quiz:
     async def game(self, server):
         """Runs a quiz game on a server."""
         self.add_server(server)
-        response = await self.get_questions(server, category=random.randint(9, 32))
+
+        try:
+            response = await self.get_questions(server, category=random.randint(9, 32))
+        except RuntimeError:
+            self.bot.send_message(server, "An error occurred in retrieving questions. "
+                                  "Please try again.")
+            self.playing_servers.pop(server.id)
+            raise RuntimeError
+
         serverinfo = self.playing_servers[server.id]
 
         # Introduction
