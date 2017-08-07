@@ -99,7 +99,9 @@ class Quiz:
         self.add_server(server)
 
         try:
-            response = await self.get_questions(server, category=random.randint(9, 32))
+            category = await self.category_selector()
+            category_name = await self.category_name(category)
+            response = await self.get_questions(server, category=category)
         except RuntimeError:
             await self.bot.send_message(server, "An error occurred in retrieving questions. "
                                         "Please try again.")
@@ -109,10 +111,10 @@ class Quiz:
         serverinfo = self.playing_servers[server.id]
 
         # Introduction
-        intro = ("Welcome to the quiz game!\n"
+        intro = ("Welcome to the quiz game! Your category is {}.\n"
                  "Remember to answer correctly as quickly as you can. "
                  "You have 10 seconds per question.\n"
-                 "The game will begin shortly.")
+                 "The game will begin shortly.".format(category_name))
         await self.bot.send_message(server, intro)
         await asyncio.sleep(4)
 
@@ -122,32 +124,31 @@ class Quiz:
             answers = [dictionary["correct_answer"]] + dictionary["incorrect_answers"]
 
             # Display question and countdown
-            question = "```\n"
-            question += html.unescape(dictionary["question"]) + "\n"
-
             if len(answers) == 2: # true/false question
                 answers = ["True", "False", "", ""]
             else:
                 answers = [html.unescape(answer) for answer in answers]
                 random.shuffle(answers)
 
-            question += "A. {}\n".format(answers[0])
-            question += "B. {}\n".format(answers[1])
-            question += "C. {}\n".format(answers[2])
-            question += "D. {}\n".format(answers[3])
-            question += "```"
+            message = "```\n"
+            message += html.unescape(dictionary["question"]) + "\n"
+            message += "A. {}\n".format(answers[0])
+            message += "B. {}\n".format(answers[1])
+            message += "C. {}\n".format(answers[2])
+            message += "D. {}\n".format(answers[3])
+            message += "```"
 
+            message_obj = await self.bot.send_message(server, message)
+            await self.bot.add_reaction(message_obj, "0⃣")
             serverinfo["Answers"].clear() # clear the previous question's answers
-            message = await self.bot.send_message(server, question)
-            await self.bot.add_reaction(message, "0⃣")
             start_time = time.perf_counter()
-            numbers = ["1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣", "🔟"]
 
+            numbers = ["1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣", "🔟"]
             for i in range(10):
                 if len(serverinfo["Answers"]) == len(serverinfo["Players"]):
                     break
                 await asyncio.sleep(1)
-                await self.bot.add_reaction(message, numbers[i])
+                await self.bot.add_reaction(message_obj, numbers[i])
 
             # Organize answers
             user_answers = serverinfo["Answers"] # snapshot serverinfo["Answers"] at this point in time
@@ -165,32 +166,31 @@ class Quiz:
             else:
                 afk_questions = 0
 
-            # Assign scores
-            for playerid in user_answers:
-                choice = user_answers[playerid]["Choice"]
-                response_time = user_answers[playerid]["Time"]
-                if answerdict[choice] == html.unescape(dictionary["correct_answer"]):
-                    time_taken = response_time - start_time
-                    assert time_taken > 0
-                    if time_taken < 1:
-                        serverinfo["Players"][playerid] += 1000 # need a time multiplier
-                    else:
-                        points = round(1000 * (1 - (time_taken / 20))) # the 20 is 2 * 10s (max answer time)
-                        serverinfo["Players"][playerid] += points
-
             # Find and display correct answer
-            correct = ""
+            correct_letter = ""
             for letter, answer in answerdict.items():
                 if answer == html.unescape(dictionary["correct_answer"]):
-                    correct = letter
+                    correct_letter = letter
                     break
-            assert answerdict[correct] == html.unescape(dictionary["correct_answer"])
-            await self.bot.send_message(server, "Correct answer:```{}. {}```"
-                                        .format(correct.upper(), answerdict[correct]))
+            assert answerdict[correct_letter] == html.unescape(dictionary["correct_answer"])
+            message = "Correct answer:```{}. {}```".format(correct_letter.upper(),
+                                                           dictionary["correct_answer"])
+            await self.bot.send_message(server, message)
+
+            # Assign scores
+            for playerid in user_answers:
+                if user_answers[playerid]["Choice"] == correct_letter:
+                    time_taken = user_answers[playerid]["Time"] - start_time
+                    assert time_taken > 0
+                    if time_taken < 1:
+                        serverinfo["Players"][playerid] += 1000
+                    else:
+                        # the 20 in the formula below is 2 * 10s (max answer time)
+                        serverinfo["Players"][playerid] += round(1000 * (1 - (time_taken / 20)))
 
             # Display top 5 players and their points
-            scoreboard = self.scoreboard(server)
-            await self.bot.send_message(server, "Scoreboard:\n" + scoreboard)
+            message = self.scoreboard(server)
+            await self.bot.send_message(server, "Scoreboard:\n" + message)
             await asyncio.sleep(4)
 
             if index < 19:
@@ -341,7 +341,28 @@ class Quiz:
                 raise RuntimeError("Token reset was unsuccessful. Response code from "
                                    "OTDB: {}".format(response_code))
 
-        return
+    async def category_selector(self):
+        """Chooses a random category that has enough questions."""
+        for _ in range(10):
+            category = random.randint(9, 32)
+            async with aiohttp.get("https://opentdb.com/api_count.php",
+                                   params={"category": category}) as response:
+                response_json = await response.json()
+                assert response_json["category_id"] == category
+                if response_json["category_question_count"]["total_question_count"] > 39:
+                    return category
+                else:
+                    print("bad category: {}".format(category))
+        raise RuntimeError("Failed to select a category.")
+
+    async def category_name(self, idnum):
+        """Finds a category's name from its number."""
+        async with aiohttp.get("https://opentdb.com/api_category.php") as response:
+            response_json = await response.json()
+            for cat_dict in response_json["trivia_categories"]:
+                if cat_dict["id"] == idnum:
+                    return cat_dict["name"]
+        raise RuntimeError("Failed to find category's name.")
 
 # Other functions
     def add_server(self, server):
