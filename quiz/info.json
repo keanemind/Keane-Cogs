@@ -1,0 +1,10 @@
+{
+    "AUTHOR" : "Keane Nguyen",
+    "INSTALL_MSG" : "Thanks for adding my cog to your server. This game is a simple Kahoot-like trivia quiz for your server members to earn credits. If you want to customize this cog, you can modify the source code manually. Please take a look at the license for my cogs in my Github repository.",
+    "NAME" : "Parrot",
+    "SHORT" : "Kahoot-like trivia game",
+    "DESCRIPTION" : "Earn credits by playing a trivia game. The earlier you answer a question correctly, the more points and credits you earn.",
+    "TAGS" : ["game", "trivia", "quiz"],
+    "REQUIREMENTS" : [],
+    "HIDDEN" : false
+}
