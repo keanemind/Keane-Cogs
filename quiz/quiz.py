@@ -82,11 +82,6 @@ class Quiz:
                                                     "Nobody else joined the quiz game.")
                         self.playing_servers.pop(serverid)
 
-                print("Started", serverinfo["Started"])
-                for playerid in serverinfo["Players"]:
-                    print(playerid, ":", serverinfo["Players"][playerid])
-                print("\n")
-
     async def on_message(self, message):
         authorid = message.author.id
         serverid = message.server.id
@@ -114,6 +109,7 @@ class Quiz:
         await asyncio.sleep(4)
 
         # Question and Answer
+        afk_questions = 0
         for index, dictionary in enumerate(response["results"]):
             answers = [dictionary["correct_answer"]] + dictionary["incorrect_answers"]
 
@@ -149,6 +145,15 @@ class Quiz:
             user_answers = serverinfo["Answers"] # snapshot serverinfo["Answers"] at this point in time
                                                  # to ignore new answers that are added to it
             answerdict = {["a", "b", "c", "d"][num]: answers[num] for num in range(4)}
+
+            # Check for AFK
+            if len(user_answers) < 2:
+                afk_questions += 1
+            if afk_questions == 3:
+                await self.bot.send_message(server, "The game has been cancelled due "
+                                            "to lack of participation.")
+                self.playing_servers.pop(server.id)
+                return
 
             # Assign scores
             for playerid in user_answers:
