@@ -5,6 +5,7 @@ import asyncio
 import time
 import datetime
 import random
+import math
 
 import aiohttp
 import discord
@@ -214,7 +215,7 @@ class Quiz:
 
         bank = self.bot.get_cog("Economy").bank
         leaderboard = "```json\n"
-        max_credits = round(.0002 * (serverinfo["Players"][idlist[0]] / 100)**2.9)
+        max_credits = self.calculate_credits(serverinfo["Players"][idlist[0]])
         end_len = len(str(max_credits)) + 1 # the 1 is for a space between a max length name and the score
         rank_len = len(str(len(serverinfo["Players"])))
         rank = 1
@@ -237,7 +238,7 @@ class Quiz:
             leaderboard += str(rank)
             leaderboard += " " * (1 + rank_len - len(str(rank)))
             leaderboard += name
-            creds = round(.0002 * (serverinfo["Players"][playerid] / 100)**2.9)
+            creds = self.calculate_credits(serverinfo["Players"][playerid])
             creds_str = str(creds)
             leaderboard += " " * (26 - rank_len - 1 - len(name) - len(creds_str))
             leaderboard += creds_str + "\n"
@@ -281,6 +282,16 @@ class Quiz:
             rank += 1
         scoreboard += "```"
         return scoreboard
+
+    def calculate_credits(self, score):
+        """Calculates credits earned from a score."""
+        adjusted = score / 100
+        if adjusted < 156.591:
+            result = .0002 * (adjusted**2.9)
+        else:
+            result = (.6625 * math.exp(.0411 * adjusted)) + 50
+
+        return round(result)
 
 # OpenTriviaDB API functions
     async def get_questions(self, server, category=None, difficulty=None):
