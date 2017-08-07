@@ -102,9 +102,9 @@ class Quiz:
             response = await self.get_questions(server, category=random.randint(9, 32))
         except RuntimeError:
             await self.bot.send_message(server, "An error occurred in retrieving questions. "
-                                  "Please try again.")
+                                        "Please try again.")
             self.playing_servers.pop(server.id)
-            raise RuntimeError
+            raise
 
         serverinfo = self.playing_servers[server.id]
 
@@ -171,6 +171,7 @@ class Quiz:
                 response_time = user_answers[playerid]["Time"]
                 if answerdict[choice] == html.unescape(dictionary["correct_answer"]):
                     time_taken = response_time - start_time
+                    assert time_taken > 0
                     if time_taken < 1:
                         serverinfo["Players"][playerid] += 1000 # need a time multiplier
                     else:
@@ -298,10 +299,12 @@ class Quiz:
                 response_code = response_json["response_code"]
                 if response_code == 0:
                     return response_json
-                elif (response_code == 1
-                      or response_code == 2):
+                elif response_code == 1:
                     raise RuntimeError("Question retrieval unsuccessful. Response "
-                                       "code from OTDB: {}".format(response_code))
+                                       "code from OTDB: 1")
+                elif response_code == 2:
+                    raise RuntimeError("Question retrieval unsuccessful. Response "
+                                       "code from OTDB: 2")
                 elif response_code == 3:
                     # Token expired. Obtain new one.
                     print("Response code from OTDB: 3")
