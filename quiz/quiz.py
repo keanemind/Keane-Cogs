@@ -157,11 +157,13 @@ class Quiz:
             # Check for AFK
             if len(user_answers) < 2:
                 afk_questions += 1
-            if afk_questions == 3:
-                await self.bot.send_message(server, "The game has been cancelled due "
-                                            "to lack of participation.")
-                self.playing_servers.pop(server.id)
-                return
+                if afk_questions == 3:
+                    await self.bot.send_message(server, "The game has been cancelled due "
+                                                "to lack of participation.")
+                    self.playing_servers.pop(server.id)
+                    return
+            else:
+                afk_questions = 0
 
             # Assign scores
             for playerid in user_answers:
