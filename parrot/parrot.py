@@ -392,7 +392,7 @@ class Parrot:
         loop, with the number of pellets they have fed and the percent chance
         they have of being perched on."""
         server = ctx.message.server
-        output = "```py\n"
+        output = "```json\n"
         feeders = self.save_file["Servers"][server.id]["Feeders"]
         parrot = self.save_file["Servers"][server.id]["Parrot"]
 
