@@ -101,7 +101,7 @@ class Quiz:
         try:
             response = await self.get_questions(server, category=random.randint(9, 32))
         except RuntimeError:
-            self.bot.send_message(server, "An error occurred in retrieving questions. "
+            await self.bot.send_message(server, "An error occurred in retrieving questions. "
                                   "Please try again.")
             self.playing_servers.pop(server.id)
             raise RuntimeError
