@@ -525,8 +525,9 @@ class Heist:
                 target = self.heist_target(settings, crew)
 
                 # BOOST MODIFICATION
-                parrot = self.bot.get_cog('Parrot')
-                if (author.id == parrot.parrot_perched_on(server)
+                parrot = self.bot.get_cog("Parrot")
+                perched_id = parrot.parrot_perched_on(server)
+                if (author.id == perched_id
                         and parrot.heist_boost_available(server, author)):
                     await self.bot.say("{} You have Parrot with you. Would you like to boost "
                                        "this {} to increase success chance to 100% and double "
@@ -549,7 +550,7 @@ class Heist:
 
                 settings["Config"]["Heist Start"] = True
                 players = [server.get_member(x) for x in settings["Crew"]]
-                results = self.game_outcomes(settings, players, target)
+                results = self.game_outcomes(settings, players, target, perched_id) # PERCH MODIFICATION
                 start_output = self.message_handler(settings, crew, players)
                 await self.bot.say("Get ready! The {} is starting with {}\nThe {} has decided to "
                                    "hit **{}**.".format(t_heist, start_output, t_crew, target))
@@ -821,12 +822,16 @@ class Heist:
         self.award_credits(deposits)
         return credit_data
 
-    def game_outcomes(self, settings, players, target):
+    def game_outcomes(self, settings, players, target, perched_id):
         success_rate = settings["Targets"][target]["Success"]
         good_out, bad_out = self.get_theme(settings)
         results = []
         for player in players:
-            chance = random.randint(1, 100)
+            # PERCH MODIFICATION
+            if player.id == perched_id:
+                chance = 1
+            else:
+                chance = random.randint(1, 100)
             if chance <= success_rate:
                 good_thing = random.choice(good_out)
                 settings["Crew"][player.id] = {"Name": player.name, "Bonus": good_thing[1]}
