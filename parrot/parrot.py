@@ -15,7 +15,7 @@ SAVE_DEFAULT = {
     "Servers": {},
     "Global": {
         "StarveTime": [5, 0], # the hour and minute of the day that starve_check runs
-        "Version": "2"
+        "Version": "2.1"
         }
     }
 
@@ -35,7 +35,9 @@ SERVER_DEFAULT = {
 
         "StarvedLoops": 0, # phase of starvation Parrot is in
 
-        "WarnedYet": False # whether the server has been warned for the current self.checktime or not
+        "WarnedYet": False, # whether the server has been warned for the current self.checktime or not
+
+        "StealAvailable": True # whether steal is available for the perched user (reset by perch_loop)
         },
     "Feeders": {} # contains user IDs as keys and dicts as values (reset by starve_check)
     }
@@ -186,8 +188,8 @@ class Parrot:
     @parrot.command(name="steal", pass_context=True, no_pm=True)
     async def parrot_steal(self, ctx, target: discord.Member):
         """Get Parrot to steal up to 1000 of someone's credits for you.
-        One use per user; this limit resets with Parrot's fullness.
-        Parrot will not steal from people who have fed him."""
+        One use per perch. Parrot will not steal from people who have
+        fed him. Parrot will not steal from someone twice in a day."""
         self.add_server(ctx.message.server) # make sure the server is in the data file
 
         feeders = self.save_file["Servers"][ctx.message.server.id]["Feeders"]
@@ -199,9 +201,9 @@ class Parrot:
         if ctx.message.author.id != parrot["UserWith"]:
             error_msg = ("Parrot needs to be perched on you to use this command. "
                          "Use `{}help parrot` for more information.".format(ctx.prefix))
-        elif not feeders[ctx.message.author.id]["StealAvailable"]:
+        elif not parrot["StealAvailable"]:
             error_msg = ("You have already used steal. You must wait until "
-                         "Parrot's fullness resets, and be perched on by him again.")
+                         "the next time you are perched on by him.")
 
         elif not bank.account_exists(target):
             error_msg = "Your target doesn't have a bank account to steal credits from."
@@ -209,6 +211,9 @@ class Parrot:
         elif target.id in feeders:
             error_msg = ("Parrot refuses to steal from someone "
                          "who has fed him in the current fullness cycle.")
+        elif target.id in feeders[ctx.message.author.id]["StolenFrom"]:
+            error_msg = ("You have already stolen from this person today. "
+                         "It is too risky to try a second time.")
 
         if error_msg:
             return await self.bot.say(error_msg)
@@ -221,17 +226,19 @@ class Parrot:
 
         if stolen >= target_balance:
             bank.transfer_credits(target, ctx.message.author, target_balance)
-            feeders[ctx.message.author.id]["StealAvailable"] = False
-            dataIO.save_json(SAVE_FILEPATH, self.save_file)
-            return await self.bot.say("Parrot stole every last credit ({} credits) from {}'s bank "
-                                      "account and deposited it in your account!"
-                                      .format(target_balance, target.mention))
+            msg = ("Parrot stole every last credit ({} credits) from "
+                   "{}'s bank account and deposited it in your account!"
+                   .format(target_balance, target.mention))
         else:
             bank.transfer_credits(target, ctx.message.author, stolen)
-            feeders[ctx.message.author.id]["StealAvailable"] = False
-            dataIO.save_json(SAVE_FILEPATH, self.save_file)
-            return await self.bot.say("Parrot stole {} credits from {}'s bank account and deposited "
-                                      "it in your account!".format(stolen, target.mention))
+            msg = ("Parrot stole {} credits from {}'s bank account "
+                   "and deposited it in your account!"
+                   .format(stolen, target.mention))
+
+        parrot["StealAvailable"] = False
+        feeders[ctx.message.author.id]["StolenFrom"].append(target.id)
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
+        return await self.bot.say(msg)
 
     @parrot.command(name="airhorn", pass_context=True, no_pm=True)
     async def parrot_airhorn(self, ctx, channel: discord.Channel):
@@ -538,8 +545,9 @@ class Parrot:
                     userwith = parrot["UserWith"] # this is an ID number
                     if "AirhornUses" not in feeders[userwith]:
                         feeders[userwith]["HeistBoostAvailable"] = True
-                        feeders[userwith]["StealAvailable"] = True
+                        feeders[userwith]["StolenFrom"] = []
                         feeders[userwith]["AirhornUses"] = 0
+                parrot["StealAvailable"] = True
 
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
@@ -631,8 +639,21 @@ class Parrot:
 
             self.save_file["Global"]["StarveTime"] = [5, 0]
             self.save_file["Global"]["Version"] = "2"
-            dataIO.save_json(SAVE_FILEPATH, self.save_file)
-            return
+
+        if self.save_file["Global"]["Version"] == "2":
+            for serverid in self.save_file["Servers"]:
+                parrot = self.save_file["Servers"][serverid]["Parrot"]
+                feeders = self.save_file["Servers"][serverid]["Feeders"]
+
+                for feederid in feeders:
+                    if "StealAvailable" in feeders[feederid]:
+                        feeders[feederid]["StolenFrom"] = []
+                parrot["StealAvailable"] = True
+
+            self.save_file["Global"]["Version"] = "2.1"
+
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
+        return
 
     def parrot_perched_on(self, server):
         """Returns the user ID of whoever Parrot is perched on.
