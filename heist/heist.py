@@ -525,7 +525,7 @@ class Heist:
                 target = self.heist_target(settings, crew)
 
                 # BOOST MODIFICATION
-                parrot = self.bot.get_cog("Parrot")
+                parrot = self.bot.get_cog('Parrot')
                 perched_id = parrot.parrot_perched_on(server)
                 if (author.id == perched_id
                         and parrot.heist_boost_available(server, author)):
