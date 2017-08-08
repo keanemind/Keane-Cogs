@@ -203,7 +203,7 @@ class Parrot:
                          "Use `{}help parrot` for more information.".format(ctx.prefix))
         elif not parrot["StealAvailable"]:
             error_msg = ("You have already used steal. You must wait until "
-                         "the next time you are perched on by him.")
+                         "the next time you are perched on.")
 
         elif not bank.account_exists(target):
             error_msg = "Your target doesn't have a bank account to steal credits from."
@@ -331,7 +331,7 @@ class Parrot:
         self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id]["AirhornUses"] += 1 # NEW
         dataIO.save_json(SAVE_FILEPATH, self.save_file) # NEW
 
-    @parrot.command(name="info", pass_context=True, no_pm=True)
+    @parrot.command(name="info", pass_context=True, no_pm=True, aliases=["stats"])
     async def parrot_info(self, ctx):
         """Information about the parrot."""
         server = ctx.message.server
