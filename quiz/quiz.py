@@ -35,8 +35,9 @@ class Quiz:
 
         In this game, you will compete with other players to correctly answer each
         question as quickly as you can. You have 10 seconds to type the answer
-        choice before time runs out. The longer you take to say the right answer,
-        the fewer points you get. If you get it wrong, you get no points.
+        choice before time runs out. Only your first answer will be registered.
+        The longer you take to say the right answer, the fewer points you get.
+        If you get it wrong, you get no points.
         """
         if ctx.invoked_subcommand is None:
             await send_cmd_help(ctx)
@@ -113,6 +114,7 @@ class Quiz:
         # Introduction
         intro = ("Welcome to the quiz game! Your category is {}.\n"
                  "Remember to answer correctly as quickly as you can. "
+                 "Only your first answer will be registered by the game. "
                  "You have 10 seconds per question.\n"
                  "The game will begin shortly.".format(category_name))
         await self.bot.send_message(channel, intro)
