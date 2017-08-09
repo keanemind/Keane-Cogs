@@ -4,6 +4,7 @@ import random
 import asyncio
 import copy
 import datetime
+import math
 
 import discord
 from discord.ext import commands
@@ -11,11 +12,14 @@ from __main__ import send_cmd_help
 from .utils import checks
 from .utils.dataIO import dataIO
 
+
+SAVE_FILEPATH = "data/KeaneCogs/parrot/parrot.json"
+
 SAVE_DEFAULT = {
     "Servers": {},
     "Global": {
         "StarveTime": [5, 0], # the hour and minute of the day that starve_check runs
-        "Version": "2.1"
+        "Version": "2.2"
         }
     }
 
@@ -42,7 +46,13 @@ SERVER_DEFAULT = {
     "Feeders": {} # contains user IDs as keys and dicts as values (reset by starve_check)
     }
 
-SAVE_FILEPATH = "data/KeaneCogs/parrot/parrot.json"
+FEEDER_DEFAULT = {
+    "PelletsFed": 0,
+    "HeistBoostAvailable": True,
+    "AirhornUses": 0,
+    "StolenFrom": [],
+    "CreditsCollected": 0
+}
 
 class Parrot:
     """Commands related to feeding the bot."""
@@ -109,7 +119,7 @@ class Parrot:
 
         # set up user's dict in the data file
         if ctx.message.author.id not in feeders:
-            feeders[ctx.message.author.id] = {"PelletsFed":0}
+            feeders[ctx.message.author.id] = copy.deepcopy(FEEDER_DEFAULT)
 
         # record how much the user has fed for the day
         feeders[ctx.message.author.id]["PelletsFed"] += amount
@@ -463,6 +473,9 @@ class Parrot:
                 # self.checktime <= datetime.datetime.utcnow()
                 await asyncio.sleep(1)
 
+            await asyncio.sleep(0.5) # ensure perch_loop has a feeders list to choose from
+                                     # ensure perch_loop gives credits before displaying
+            await self.display_collected()
             await self.starve_check()
 
     async def warning_loop(self):
@@ -501,16 +514,16 @@ class Parrot:
     async def perch_loop(self):
         """Runs in a loop to periodically set someone (or nobody) as
         the person Parrot is with. Also records how many hours Parrot
-        has lived in each server."""
+        has lived in each server. At checktime, perch_loop should run
+        before starve_loop's display_collected and starve_check."""
         perchtime = datetime.datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+        bank = self.bot.get_cog('Economy').bank
         while True:
             while perchtime <= datetime.datetime.utcnow():
                 perchtime = perchtime + datetime.timedelta(minutes=20) # IMPORTANT: make sure minutes is
                                                                        # a factor or multiple of 60!
             await asyncio.sleep((perchtime - datetime.datetime.utcnow()).total_seconds())
-
-            while perchtime > datetime.datetime.utcnow(): # failsafe mechanism
-                await asyncio.sleep(1)
+            # Warning: this sleep tends to end very very slightly too soon.
 
             for serverid in self.save_file["Servers"]:
                 feeders = self.save_file["Servers"][serverid]["Feeders"]
@@ -541,12 +554,14 @@ class Parrot:
                             parrot["UserWith"] = population[index]
                             break
 
-                if parrot["UserWith"]:
-                    userwith = parrot["UserWith"] # this is an ID number
-                    if "AirhornUses" not in feeders[userwith]:
-                        feeders[userwith]["HeistBoostAvailable"] = True
-                        feeders[userwith]["StolenFrom"] = []
-                        feeders[userwith]["AirhornUses"] = 0
+                # Give perched user some credits
+                if parrot["UserWith"]: # this should run before Feeders is reset
+                    member = self.bot.get_server(serverid).get_member(parrot["UserWith"])
+                    creds = self.credits_collecting(feeders[parrot["UserWith"]]["PelletsFed"])
+
+                    bank.deposit_credits(member, creds)
+                    feeders[parrot["UserWith"]]["CreditsCollected"] += creds
+
                 parrot["StealAvailable"] = True
 
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
@@ -558,9 +573,11 @@ class Parrot:
         for serverid in list(self.save_file["Servers"]): # generate a list because servers might
                                                          # be removed from the dict while iterating
             parrot = self.save_file["Servers"][serverid]["Parrot"]
+            feeders = self.save_file["Servers"][serverid]["Feeders"]
 
             # don't check on the first loop to give new servers a chance
             # in case they got added at an unlucky time (right before the check happens)
+            reset = False
             if parrot["ChecksAlive"] == 0:
                 parrot["ChecksAlive"] += 1
             elif parrot["Fullness"] / parrot["Appetite"] < 0.5:
@@ -575,25 +592,53 @@ class Parrot:
                 else:
                     # advance to the next stage of starvation
                     parrot["StarvedLoops"] += 1
-                    parrot["ChecksAlive"] += 1
-                    parrot["Appetite"] = round(random.normalvariate(50*(1.75**parrot["StarvedLoops"]), 6))
-                    parrot["Fullness"] = 0
-                    parrot["UserWith"] = ""
-                    parrot["WarnedYet"] = False
-                    self.save_file["Servers"][serverid]["Feeders"].clear()
-                    # https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
+                    reset = True
             else:
                 # healthy; reset for the next loop
                 parrot["StarvedLoops"] = 0
+                reset = True
+
+            if reset:
                 parrot["ChecksAlive"] += 1
                 parrot["Appetite"] = round(random.normalvariate(50*(1.75**parrot["StarvedLoops"]), 6))
                 parrot["Fullness"] = 0
-                parrot["UserWith"] = ""
                 parrot["WarnedYet"] = False
                 self.save_file["Servers"][serverid]["Feeders"].clear()
                 # https://stackoverflow.com/questions/369898/difference-between-dict-clear-and-assigning-in-python
+                if parrot["UserWith"]:
+                    feeders[parrot["UserWith"]] = copy.deepcopy(FEEDER_DEFAULT)
 
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
+
+    async def display_collected(self):
+        """Display a leaderboard in each server with how many credits
+        Parrot collected for users."""
+        for serverid in self.save_file["Servers"]:
+            server = self.bot.get_server(serverid)
+            leaderboard = ("Here's how many credits I collected for "
+                           "everyone I perched on today:\n\n")
+            leaderboard += "```py\n"
+            feeders = self.save_file["Servers"][serverid]["Feeders"]
+            perched_users = [feederid for feederid in feeders
+                             if feeders[feederid]["CreditsCollected"] > 0]
+            if not perched_users:
+                continue # nobody got perched on, skip this server
+            ranked = sorted(list(perched_users),
+                            key=lambda idnum: feeders[idnum]["CreditsCollected"],
+                            reverse=True)
+            max_creds_len = len(str(feeders[ranked[0]]["CreditsCollected"]))
+            for user_id in ranked:
+                user = server.get_member(user_id)
+                if len(user.display_name) > 26 - max_creds_len - 1:
+                    name = user.display_name[22 - max_creds_len] + "..."
+                else:
+                    name = user.display_name
+                leaderboard += name
+                collected = feeders[user_id]["CreditsCollected"]
+                leaderboard += " " * (26 - len(name) - len(str(collected)))
+                leaderboard += str(collected) + "\n"
+            leaderboard += "```"
+            await self.bot.send_message(server, leaderboard)
 
     def add_server(self, server):
         """Adds the server to the file if it isn't already in it."""
@@ -625,6 +670,17 @@ class Parrot:
                     self.save_file["Servers"][serverid]["Parrot"]["WarnedYet"] = False
                 dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
+    def credits_collecting(self, pellets):
+        """Calculates how many credits Parrot will collect during the perch."""
+        if pellets <= 10:
+            avg_creds = 60
+        elif 10 < pellets < 31.789:
+            avg_creds = 58.556 + (3 * math.log(pellets - 8.5))
+        else:
+            avg_creds = 68
+
+        return round(random.normalvariate(avg_creds, avg_creds / 12))
+
     def update_version(self):
         """Update the save file if necessary."""
         if "Version" not in self.save_file["Global"]: # if version == 1
@@ -652,8 +708,19 @@ class Parrot:
 
             self.save_file["Global"]["Version"] = "2.1"
 
+        if self.save_file["Global"]["Version"] == "2.1":
+            for serverid in self.save_file["Servers"]:
+                feeders = self.save_file["Servers"][serverid]["Feeders"]
+
+                for feederid in feeders:
+                    feeders[feederid]["CreditsCollected"] = 0
+                    feeders[feederid]["StolenFrom"] = []
+                    feeders[feederid]["AirhornUses"] = 0
+                    feeders[feederid]["HeistBoostAvailable"] = True
+
+            self.save_file["Global"]["Version"] = "2.2"
+
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
-        return
 
     def parrot_perched_on(self, server):
         """Returns the user ID of whoever Parrot is perched on.
