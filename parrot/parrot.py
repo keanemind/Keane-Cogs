@@ -51,7 +51,7 @@ FEEDER_DEFAULT = {
     "HeistBoostAvailable": True,
     "AirhornUses": 0,
     "StolenFrom": [],
-    "CreditsCollected": 0
+    "CreditsCollected": 0.0
 }
 
 class Parrot:
@@ -467,7 +467,7 @@ class Parrot:
         # servers that use a Parrot command for the first time get added to the data file
         # and still follow the starvecheck schedule below
         while True:
-            self.update_checktime()
+            self.update_checktime() # checktime must be updated every day for Parrot's functioning
             while self.checktime > datetime.datetime.utcnow():
                 # This loop cannot be instantly broken out of
                 # by changing StarveTime, unlike the loop in
@@ -477,7 +477,7 @@ class Parrot:
                 await asyncio.sleep(1)
 
             await asyncio.sleep(0.5) # ensure perch_loop has a feeders list to choose from
-                                     # ensure perch_loop gives credits before displaying
+                                     # ensure perch_loop updates CreditsCollected before displaying
             await self.display_collected()
             await self.starve_check()
 
@@ -557,13 +557,8 @@ class Parrot:
                             parrot["UserWith"] = population[index]
                             break
 
-                # Give perched user some credits
-                if parrot["UserWith"]: # this should run before Feeders is reset
-                    member = self.bot.get_server(serverid).get_member(parrot["UserWith"])
-                    creds = self.credits_collecting(feeders[parrot["UserWith"]]["PelletsFed"])
-
-                    bank.deposit_credits(member, creds)
-                    feeders[parrot["UserWith"]]["CreditsCollected"] += creds
+                # Collect credits for feeders (credits are deposited in starve_check)
+                self.collect_credits(serverid)
 
                 parrot["StealAvailable"] = True
 
@@ -615,7 +610,8 @@ class Parrot:
 
     async def display_collected(self):
         """Display a leaderboard in each server with how many credits
-        Parrot collected for users."""
+        Parrot collected for users. Award CreditsCollected to each feeder."""
+        bank = self.bot.get_cog('Economy').bank
         for serverid in self.save_file["Servers"]:
             server = self.bot.get_server(serverid)
             leaderboard = ("Here's how many credits I collected for "
@@ -637,7 +633,10 @@ class Parrot:
                 else:
                     name = user.display_name
                 leaderboard += name
-                collected = feeders[user_id]["CreditsCollected"]
+
+                collected = round(feeders[user_id]["CreditsCollected"])
+                bank.deposit_credits(user, collected)
+
                 leaderboard += " " * (26 - len(name) - len(str(collected)))
                 leaderboard += str(collected) + "\n"
             leaderboard += "```"
@@ -673,16 +672,32 @@ class Parrot:
                     self.save_file["Servers"][serverid]["Parrot"]["WarnedYet"] = False
                 dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
-    def credits_collecting(self, pellets):
+    def collect_credits(self, serverid):
         """Calculates how many credits Parrot will collect during the perch."""
-        if pellets <= 10:
-            avg_creds = 60
-        elif 10 < pellets < 31.789:
-            avg_creds = 58.556 + (3 * math.log(pellets - 8.5))
-        else:
-            avg_creds = 68
+        parrot = self.save_file["Servers"][serverid]["Parrot"]
+        feeders = self.save_file["Servers"][serverid]["Feeders"]
 
-        return round(random.normalvariate(avg_creds, avg_creds / 12))
+        # Generate multiplier
+        since_checktime = datetime.datetime.utcnow() - self.checktime
+        current_minute = round(since_checktime.total_seconds() / 60)
+        current_minute = current_minute % 1440
+        multiplier = 0
+        for i in range(current_minute, current_minute + 20): # 20 is perch interval in minutes
+            multiplier += 1.003**i
+        multiplier = multiplier / 24568
+
+        for feederid in feeders:
+            pellets = feeders[feederid]["PelletsFed"]
+            if pellets > 50: # Feeding more than 50 pellets (average healthy appetite) is ignored
+                pellets = 50
+
+            # 1.5 * parrot["Cost"] * pellets is exactly
+            # how much the feeder would earn at the end of
+            # the day if they fed right after checktime
+
+            feeders[feederid]["CreditsCollected"] += 1.5 * parrot["Cost"] * pellets * multiplier
+
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     def update_version(self):
         """Update the save file if necessary."""
