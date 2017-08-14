@@ -4,7 +4,6 @@ import random
 import asyncio
 import copy
 import datetime
-import math
 
 import discord
 from discord.ext import commands
@@ -520,7 +519,6 @@ class Parrot:
         has lived in each server. At checktime, perch_loop should run
         before starve_loop's display_collected and starve_check."""
         perchtime = datetime.datetime.utcnow().replace(minute=0, second=0, microsecond=0)
-        bank = self.bot.get_cog('Economy').bank
         while True:
             while perchtime <= datetime.datetime.utcnow():
                 perchtime = perchtime + datetime.timedelta(minutes=20) # IMPORTANT: make sure minutes is
