@@ -617,13 +617,13 @@ class Parrot:
             leaderboard += "```py\n"
             feeders = self.save_file["Servers"][serverid]["Feeders"]
             perched_users = [feederid for feederid in feeders
-                             if feeders[feederid]["CreditsCollected"] > 0]
+                             if round(feeders[feederid]["CreditsCollected"]) > 0]
             if not perched_users:
                 continue # nobody got perched on, skip this server
             ranked = sorted(list(perched_users),
                             key=lambda idnum: feeders[idnum]["CreditsCollected"],
                             reverse=True)
-            max_creds_len = len(str(feeders[ranked[0]]["CreditsCollected"]))
+            max_creds_len = len(str(round(feeders[ranked[0]]["CreditsCollected"])))
             for user_id in ranked:
                 user = server.get_member(user_id)
                 if len(user.display_name) > 26 - max_creds_len - 1:
