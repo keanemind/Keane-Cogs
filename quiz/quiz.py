@@ -133,7 +133,7 @@ class Quiz:
                 random.shuffle(answers)
 
             message = "```\n"
-            message += html.unescape(dictionary["question"]) + "\n"
+            message += "{} ({}/20)\n".format(html.unescape(dictionary["question"]), index + 1)
             message += "A. {}\n".format(answers[0])
             message += "B. {}\n".format(answers[1])
             message += "C. {}\n".format(answers[2])
