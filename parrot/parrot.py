@@ -19,8 +19,8 @@ SAVE_DEFAULT = {
     "Global": {
         "StarveTime": [5, 0], # the hour and minute of the day that starve_check runs
         "Version": "2.2"
-        }
     }
+}
 
 SERVER_DEFAULT = {
     "Parrot": {
@@ -41,9 +41,9 @@ SERVER_DEFAULT = {
         "WarnedYet": False, # whether the server has been warned for the current self.checktime or not
 
         "StealAvailable": True # whether steal is available for the perched user (reset by perch_loop)
-        },
+    },
     "Feeders": {} # contains user IDs as keys and dicts as values (reset by starve_check)
-    }
+}
 
 FEEDER_DEFAULT = {
     "PelletsFed": 0,
