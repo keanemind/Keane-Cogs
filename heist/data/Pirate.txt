@@ -26,7 +26,7 @@
 |Bad| "{0} was too sea sick to fight.", "Apprehended"
 |Bad| "{0} was knocked out and taken prisoner.", "Apprehended"
 |Bad| "{0} was surrounded by the enemy and captured.", "Apprehended"
-|Bad| "The enemy sneaked up on {0} and was taken prisoner.", "Apprehended"
+|Bad| "The enemy sneaked up on {0}, who was taken prisoner.", "Apprehended"
 |Bad| "{0} was covered in a net, and was unable to break free.", "Apprehended"
 |Bad| "{0} drank too much rum before the fight and passed out.", "Apprehended"
 |Bad| "A storm blew {0} off the crow's nest and fell to their death.", "Dead"
