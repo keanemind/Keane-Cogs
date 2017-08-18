@@ -56,7 +56,6 @@ FEEDER_DEFAULT = {
 
 class Parrot:
     """Commands related to feeding the bot."""
-    start_time = 0.0
 
     def __init__(self, bot):
         self.save_file = dataIO.load_json(SAVE_FILEPATH)
