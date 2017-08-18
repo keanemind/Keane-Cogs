@@ -146,11 +146,23 @@ class Parrot:
         if ctx.invoked_subcommand is None:
             await send_cmd_help(ctx)
 
-    @parrot.command(name="setstarvetime", pass_context=True) # no_pm=False
+    @parrot.command(name="starvetime", pass_context=True) # no_pm=False
     @checks.is_owner()
-    async def parrot_set_starve_time(self, ctx, hour: int, minute: int):
-        """Change that time at which Parrot checks whether he has starved and resets his appetite.
-        This command takes UTC time. (0 <= hour <= 23) (0 <= minute <= 59)"""
+    async def parrot_starve_time(self, ctx, hour: int = None, minute: int = 0):
+        """View or change the time at which Parrot checks whether he has starved
+        and resets his appetite. This command takes UTC time.
+        (0 <= hour <= 23) (0 <= minute <= 59)"""
+
+        if hour is None:
+            cur_hour = self.save_file["Global"]["StarveTime"][0]
+            cur_minute = self.save_file["Global"]["StarveTime"][1]
+            cur_time = datetime.time(cur_hour, cur_minute)
+            return await self.bot.say("Current setting: {} UTC".format(cur_time.strftime("%H:%M")))
+
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            return await self.bot.say("Hour must be greater than -1 and less than 24. "
+                                      "Minute must be greater than -1 and less than 60. "
+                                      "Both numbers must be integers.")
 
         # confirmation prompt
         await self.bot.say("This is a global setting that affects all servers the bot is connected to. "
@@ -162,15 +174,10 @@ class Parrot:
         if response is None or response.content.lower().strip() != "yes":
             return await self.bot.say("Setting change cancelled.")
 
-        if 0 <= hour <= 23 and 0 <= minute <= 59:
-            self.save_file["Global"]["StarveTime"] = [hour, minute]
-            dataIO.save_json(SAVE_FILEPATH, self.save_file)
-            self.update_looptimes()
-            return await self.bot.say("Setting change successful.")
-        else:
-            return await self.bot.say("Hour must be greater than -1 and less than 24. "
-                                      "Minute must be greater than -1 and less than 60. "
-                                      "Both numbers must be integers.")
+        self.save_file["Global"]["StarveTime"] = [hour, minute]
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
+        self.update_looptimes()
+        return await self.bot.say("Setting change successful.")
 
     @parrot.command(name="perchinterval", pass_context=True) # no_pm=False
     @checks.is_owner()
