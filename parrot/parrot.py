@@ -18,7 +18,8 @@ SAVE_DEFAULT = {
     "Servers": {},
     "Global": {
         "StarveTime": [5, 0], # the hour and minute of the day that starve_check runs
-        "Version": "2.2"
+        "PerchInterval": 20, # the number of minutes between perches
+        "Version": "2.3"
     }
 }
 
@@ -64,11 +65,10 @@ class Parrot:
         self.update_version()
 
         self.checktime = datetime.datetime.utcnow() # dummy value
-        self.update_checktime(False) # change checktime to what it should be
+        self.perchtime = datetime.datetime.utcnow() # dummy value
+        self.update_looptimes(False) # change checktime to what it should be
                                      # without causing a new warning
-        self.starve_task = bot.loop.create_task(self.starve_loop()) # remember to change __unload()
-        self.warning_task = bot.loop.create_task(self.warning_loop())
-        self.perch_task = bot.loop.create_task(self.perch_loop())
+        self.loop_task = bot.loop.create_task(self.loop()) # remember to change __unload()
 
     @commands.command(pass_context=True, no_pm=True)
     async def feed(self, ctx, amount: int):
@@ -165,12 +165,40 @@ class Parrot:
         if 0 <= hour <= 23 and 0 <= minute <= 59:
             self.save_file["Global"]["StarveTime"] = [hour, minute]
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
-            self.update_checktime()
+            self.update_looptimes()
             return await self.bot.say("Setting change successful.")
         else:
             return await self.bot.say("Hour must be greater than -1 and less than 24. "
                                       "Minute must be greater than -1 and less than 60. "
                                       "Both numbers must be integers.")
+
+    @parrot.command(name="perchinterval", pass_context=True) # no_pm=False
+    @checks.is_owner()
+    async def parrot_perch_interval(self, ctx, minutes: int = None):
+        """View or change how many minutes pass between perches."""
+        if minutes is None:
+            interval = self.save_file["Global"]["PerchInterval"]
+            return await self.bot.say("Current setting: {} minutes".format(interval))
+        if not 0 < minutes <= 1440:
+            return await self.bot.say("The number of minutes must be greater than 0 "
+                                      "and less than or equal to 1440.")
+        if not (60 % minutes == 0 or minutes % 60 == 0):
+            return await self.bot.say("The number of minutes must be a factor or "
+                                      "multiple of 60.")
+
+        # confirmation prompt
+        await self.bot.say("This is a global setting that affects all servers the bot is connected to. "
+                           "Every day, the first perch is at Parrot's starve time. For the rest of the day, "
+                           "Parrot will wait {} minutes between perches. Reply \"yes\" "
+                           "to confirm.".format(minutes))
+        response = await self.bot.wait_for_message(timeout=15, author=ctx.message.author)
+        if response is None or response.content.lower().strip() != "yes":
+            return await self.bot.say("Setting change cancelled.")
+
+        self.save_file["Global"]["PerchInterval"] = minutes
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
+        self.update_looptimes() # this updates self.perchtime with the new interval
+        return await self.bot.say("Setting change successful.")
 
     @parrot.command(name="checknow", pass_context=True) # no_pm=False
     @checks.is_owner()
@@ -459,36 +487,28 @@ class Parrot:
         output += "```"
         return await self.bot.say(output)
 
-    async def starve_loop(self):
-        """Runs in a loop to check whether Parrot has starved or not."""
-        # check if starved. if starved, leave and wipe data
-        # otherwise, reset settings except permanent ones (generate new appetite)
-        # servers that use a Parrot command for the first time get added to the data file
-        # and still follow the starvecheck schedule below
-        while True:
-            self.update_checktime() # checktime must be updated every day for Parrot's functioning
-            while self.checktime > datetime.datetime.utcnow():
-                # This loop cannot be instantly broken out of
-                # by changing StarveTime, unlike the loop in
-                # warning_loop. This is because self.checktime
-                # cannot be updated in such a way that
-                # self.checktime <= datetime.datetime.utcnow()
-                await asyncio.sleep(1)
+    async def loop(self):
+        """Loop forever to do four tasks:
 
-            await asyncio.sleep(0.5) # ensure perch_loop has a feeders list to choose from
-                                     # ensure perch_loop updates CreditsCollected before displaying
-            await self.display_collected()
-            await self.starve_check()
-
-    async def warning_loop(self):
-        """Runs in a loop to warn the server when Parrot is starving soon."""
+        Update HoursAlive, warn servers when Parrot is starving soon,
+        perch on users at perchtime, and reset Parrot at checktime."""
+        self.update_looptimes()
+        current_hour = datetime.datetime.utcnow().hour
         while True:
+            now = datetime.datetime.utcnow()
+
+            # Update HoursAlive
+            if current_hour != now.hour:
+                current_hour = now.hour
+                for serverid in self.save_file["Servers"]:
+                    self.save_file["Servers"][serverid]["Parrot"]["HoursAlive"] += 1
+
+                dataIO.save_json(SAVE_FILEPATH, self.save_file)
+
+            # Send starvation warnings to each server (if they haven't been sent yet)
             stoptime = self.checktime + datetime.timedelta(hours=-4)
-
-            # if self.checktime is changed so that the warning should
-            # already have happened today, the below will run immediately
-
-            if stoptime <= datetime.datetime.utcnow():
+            if stoptime <= now:
+                change = False
                 for serverid in self.save_file["Servers"]:
                     parrot = self.save_file["Servers"][serverid]["Parrot"]
                     if (parrot["ChecksAlive"] > 0
@@ -509,58 +529,57 @@ class Parrot:
                                 "*I'm going to* ***DIE*** *of starvation very "
                                 "soon if I don't get fed!*")
                         parrot["WarnedYet"] = True
+                        change = True
+                if change:
+                    dataIO.save_json(SAVE_FILEPATH, self.save_file)
+
+            # Perch
+            if self.perchtime <= now:
+                # Choose perched user
+                for serverid in self.save_file["Servers"]:
+                    feeders = self.save_file["Servers"][serverid]["Feeders"]
+                    parrot = self.save_file["Servers"][serverid]["Parrot"]
+
+                    weights = [(feeders[feederid]["PelletsFed"] / parrot["Appetite"])
+                               * 100 for feederid in feeders]
+                    population = list(feeders)
+                    weights.append(100 - sum(weights))
+                    population.append("")
+                    # Randomly choose who Parrot is with. This could be nobody, represented by ""
+                    try:
+                        parrot["UserWith"] = random.choices(population, weights)[0] #random.choices returns a list
+                    except AttributeError:
+                        # DIY random.choices alternative for scrubs who don't have Python 3.6
+                        total = 0
+                        cum_weights = []
+                        for num in weights:
+                            total += num
+                            cum_weights.append(total)
+
+                        rand = random.uniform(0, 100)
+                        for index, weight in enumerate(cum_weights):
+                            if weight >= rand:
+                                parrot["UserWith"] = population[index]
+                                break
+
+                # Reset at checktime (checktime is always on a perchtime)
+                if self.checktime <= now:
+                    await self.display_collected()
+                    await self.starve_check()
+                    self.update_looptimes() # checktime must be updated daily
+
+                # Collect coins for perched user
+                for serverid in self.save_file["Servers"]:
+                    self.collect_credits(serverid)
+                    self.save_file["Servers"][serverid]["Parrot"]["StealAvailable"] = True
+
+                # Update perchtime
+                interval = self.save_file["Global"]["PerchInterval"]
+                self.perchtime = self.perchtime + datetime.timedelta(minutes=interval)
+
                 dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
             await asyncio.sleep(1)
-
-    async def perch_loop(self):
-        """Runs in a loop to periodically set someone (or nobody) as
-        the person Parrot is with. Also records how many hours Parrot
-        has lived in each server. At checktime, perch_loop should run
-        before starve_loop's display_collected and starve_check."""
-        perchtime = datetime.datetime.utcnow().replace(minute=0, second=0, microsecond=0)
-        while True:
-            while perchtime <= datetime.datetime.utcnow():
-                perchtime = perchtime + datetime.timedelta(minutes=20) # IMPORTANT: make sure minutes is
-                                                                       # a factor or multiple of 60!
-            await asyncio.sleep((perchtime - datetime.datetime.utcnow()).total_seconds())
-            # Warning: this sleep tends to end very very slightly too soon.
-
-            for serverid in self.save_file["Servers"]:
-                feeders = self.save_file["Servers"][serverid]["Feeders"]
-                parrot = self.save_file["Servers"][serverid]["Parrot"]
-
-                if datetime.datetime.utcnow().minute == 0:
-                    parrot["HoursAlive"] += 1
-
-                weights = [(feeders[feederid]["PelletsFed"] / parrot["Appetite"])
-                           * 100 for feederid in feeders]
-                population = list(feeders)
-                weights.append(100 - sum(weights))
-                population.append("")
-                # Randomly choose who Parrot is with. This could be nobody, represented by ""
-                try:
-                    parrot["UserWith"] = random.choices(population, weights)[0] #random.choices returns a list
-                except AttributeError:
-                    # DIY random.choices alternative for scrubs who don't have Python 3.6
-                    total = 0
-                    cum_weights = []
-                    for num in weights:
-                        total += num
-                        cum_weights.append(total)
-
-                    rand = random.uniform(0, 100)
-                    for index, weight in enumerate(cum_weights):
-                        if weight >= rand:
-                            parrot["UserWith"] = population[index]
-                            break
-
-                # Collect credits for feeders (credits are deposited in starve_check)
-                self.collect_credits(serverid)
-
-                parrot["StealAvailable"] = True
-
-            dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     async def starve_check(self):
         """Check if Parrot has starved or not.
@@ -649,10 +668,11 @@ class Parrot:
             print("{} New server \"{}\" found and added to Parrot data file!"
                   .format(datetime.datetime.now(), server.name))
 
-    def update_checktime(self, warn=True):
-        """Update self.checktime for the latest StarveTime.
-        If StarveTime has already passed today, self.checktime
-        will be StarveTime tomorrow."""
+    def update_looptimes(self, warn=True):
+        """Update self.checktime for the latest StarveTime. If StarveTime
+        has already passed today, self.checktime will be StarveTime tomorrow.
+        Update self.perchtime for the latest StarveTime or PerchInterval."""
+        # Update self.checktime
         starvetime = self.save_file["Global"]["StarveTime"]
         checktime = datetime.datetime.utcnow().replace(hour=starvetime[0],
                                                        minute=starvetime[1],
@@ -670,17 +690,24 @@ class Parrot:
                     self.save_file["Servers"][serverid]["Parrot"]["WarnedYet"] = False
                 dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
+        # Update self.perchtime
+        interval = self.save_file["Global"]["PerchInterval"]
+        self.perchtime = self.checktime + datetime.timedelta(days=-1)
+        while self.perchtime < datetime.datetime.utcnow():
+            self.perchtime = self.perchtime + datetime.timedelta(minutes=interval)
+
     def collect_credits(self, serverid):
         """Calculates how many credits Parrot will collect during the perch."""
         parrot = self.save_file["Servers"][serverid]["Parrot"]
         feeders = self.save_file["Servers"][serverid]["Feeders"]
+        interval = self.save_file["Global"]["PerchInterval"]
 
         # Generate multiplier
         since_checktime = datetime.datetime.utcnow() - self.checktime
         current_minute = round(since_checktime.total_seconds() / 60)
         current_minute = current_minute % 1440
         multiplier = 0
-        for i in range(current_minute, current_minute + 20): # 20 is perch interval in minutes
+        for i in range(current_minute, current_minute + interval):
             multiplier += 1.003**i
         multiplier = multiplier / 24568
 
@@ -736,6 +763,10 @@ class Parrot:
 
             self.save_file["Global"]["Version"] = "2.2"
 
+        if self.save_file["Global"]["Version"] == "2.2":
+            self.save_file["Global"]["PerchInterval"] = 20
+            self.save_file["Global"]["Version"] = "2.3"
+
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     def parrot_perched_on(self, server):
@@ -757,9 +788,7 @@ class Parrot:
         return self.save_file["Servers"][server.id]["Feeders"][user.id]["HeistBoostAvailable"]
 
     def __unload(self):
-        self.starve_task.cancel()
-        self.perch_task.cancel()
-        self.warning_task.cancel()
+        self.loop_task.cancel()
 
 def dir_check():
     """Creates a folder and save file for the cog if they don't exist."""
