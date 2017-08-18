@@ -286,7 +286,7 @@ class Parrot:
 
     @parrot.command(name="airhorn", pass_context=True, no_pm=True)
     async def parrot_airhorn(self, ctx, channel: discord.Channel):
-        """Plays an airhorn sound to the target voice channel."""
+        """Play an airhorn sound to the target voice channel."""
         # This is copy-pasted from audio.py's play() function and has
         # been modified to always play an airhorn.
         # Audio.py is a part of Red Bot, which is licensed under GPL v3
@@ -596,7 +596,7 @@ class Parrot:
     async def starve_check(self):
         """Check if Parrot has starved or not.
         If Parrot has starved, leave the server. If he has survived,
-        move on to the next loop."""
+        reset for the next loop."""
         for serverid in list(self.save_file["Servers"]): # generate a list because servers might
                                                          # be removed from the dict while iterating
             parrot = self.save_file["Servers"][serverid]["Parrot"]
@@ -672,7 +672,7 @@ class Parrot:
             await self.bot.send_message(server, leaderboard)
 
     def add_server(self, server):
-        """Adds the server to the file if it isn't already in it."""
+        """Add the server to the file if it isn't already in it."""
         if server.id not in self.save_file["Servers"]:
             self.save_file["Servers"][server.id] = copy.deepcopy(SERVER_DEFAULT)
             self.save_file["Servers"][server.id]["Parrot"]["Appetite"] = round(random.normalvariate(50, 6))
@@ -709,7 +709,7 @@ class Parrot:
             self.perchtime = self.perchtime + datetime.timedelta(minutes=interval)
 
     def collect_credits(self, serverid):
-        """Calculates how many credits Parrot will collect during the perch."""
+        """Calculate how many credits Parrot will collect during the perch."""
         parrot = self.save_file["Servers"][serverid]["Parrot"]
         feeders = self.save_file["Servers"][serverid]["Feeders"]
         interval = self.save_file["Global"]["PerchInterval"]
@@ -782,14 +782,14 @@ class Parrot:
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     def parrot_perched_on(self, server):
-        """Returns the user ID of whoever Parrot is perched on.
+        """Return the user ID of whoever Parrot is perched on.
 
         This is for Heist.py to use for heist boost."""
         self.add_server(server) # make sure the server is in the data file
         return self.save_file["Servers"][server.id]["Parrot"]["UserWith"]
 
     def heist_boost_available(self, server, user, availability=True):
-        """Returns whether the user has a Heist boost available.
+        """Return whether the user has a Heist boost available.
         Optionally set availability to False to set the user's HeistBoostAvailable to False.
 
         This is for Heist.py to use for heist boost."""
@@ -803,7 +803,7 @@ class Parrot:
         self.loop_task.cancel()
 
 def dir_check():
-    """Creates a folder and save file for the cog if they don't exist."""
+    """Create a folder and save file for the cog if they don't exist."""
     if not os.path.exists("data/KeaneCogs/parrot"):
         print("Creating data/KeaneCogs/parrot folder...")
         os.makedirs("data/KeaneCogs/parrot")
@@ -813,6 +813,6 @@ def dir_check():
         dataIO.save_json(SAVE_FILEPATH, SAVE_DEFAULT)
 
 def setup(bot):
-    """Creates a Parrot object."""
+    """Create a Parrot object."""
     dir_check()
     bot.add_cog(Parrot(bot))
