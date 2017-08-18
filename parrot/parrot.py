@@ -312,6 +312,8 @@ class Parrot:
                                       "Parrot's fullness resets, and be perched on by him again.") # NEW
 
         audio = self.bot.get_cog('Audio') # NEW
+        if audio is None: # NEW
+            return await self.bot.say("`Error: The Audio cog is not loaded.`") # NEW
         url = "https://www.youtube.com/watch?v=XDvuAYySJj0" # This line was changed to be a hard-coded
                                                             # YouTube link instead of being a URL argument.
 
