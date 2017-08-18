@@ -82,18 +82,20 @@ class Parrot:
         feeders = self.save_file["Servers"][server.id]["Feeders"]
         bank = self.bot.get_cog('Economy').bank
 
-        # check if user has a bank account to withdraw credits from
+        # Checks
+        error_msg = ""
         if not bank.account_exists(ctx.message.author):
-            return await self.bot.say("You need to have a bank account with credits to feed me. "
-                                      "Use `{}bank register` to open one.".format(ctx.prefix))
+            error_msg = ("You need to have a bank account with credits to feed me. "
+                         "Use `{}bank register` to open one.".format(ctx.prefix))
 
-        # feeding negative pellets is not allowed
-        if amount <= 0:
-            return await self.bot.say("You can't feed me nothing!")
+        elif amount <= 0:
+            error_msg = "You can't feed me nothing!"
 
-        # make sure parrot isn't full
-        if parrot["Fullness"] == parrot["Appetite"]:
-            return await self.bot.say("I'm full! I don't want to get fat.")
+        elif parrot["Fullness"] == parrot["Appetite"]:
+            error_msg = "I'm full! I don't want to get fat."
+
+        if error_msg:
+            return await self.bot.say(error_msg)
 
         # make sure parrot doesn't get overfed
         if parrot["Fullness"] + amount > parrot["Appetite"]:
@@ -312,8 +314,6 @@ class Parrot:
                                       "Parrot's fullness resets, and be perched on by him again.") # NEW
 
         audio = self.bot.get_cog('Audio') # NEW
-        if audio is None: # NEW
-            return await self.bot.say("`Error: The Audio cog is not loaded.`") # NEW
         url = "https://www.youtube.com/watch?v=XDvuAYySJj0" # This line was changed to be a hard-coded
                                                             # YouTube link instead of being a URL argument.
 
