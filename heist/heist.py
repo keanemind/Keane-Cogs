@@ -526,27 +526,30 @@ class Heist:
 
                 # BOOST MODIFICATION
                 parrot = self.bot.get_cog('Parrot')
-                perched_id = parrot.parrot_perched_on(server)
-                if (author.id == perched_id
-                        and parrot.heist_boost_available(server, author)):
-                    await self.bot.say("{} You have Parrot with you. Would you like to boost "
-                                       "this {} to increase success chance to 100% and double "
-                                       "earnings for all crew? You can only use this once until "
-                                       "Parrot's appetite resets.\n"
-                                       "Reply with \"yes\" to boost."
-                                       .format(author.mention, t_heist))
-                    boost_reply = await self.bot.wait_for_message(author=author)
-                    if boost_reply.content.lower().strip() == "yes":
-                        # activate boost!
-                        old_success = settings["Targets"][target]["Success"]
-                        settings["Targets"][target]["Success"] = 100 # changed back later
-                        settings["Targets"][target]["Vault"] *= 2 # double vault
-                        parrot.heist_boost_available(server, author, False) # have Parrot remember that
-                                                                            # the user used the command
-                                                                            # and can't use it again
-                        await self.bot.say("Boost activated!")
-                    else:
-                        await self.bot.say("Boost not used.")
+                if parrot: # if the Parrot cog is loaded
+                    perched_id = parrot.parrot_perched_on(server)
+                    if (author.id == perched_id
+                            and parrot.heist_boost_available(server, author)):
+                        await self.bot.say("{} You have Parrot with you. Would you like to boost "
+                                        "this {} to increase success chance to 100% and double "
+                                        "earnings for all crew? You can only use this once until "
+                                        "Parrot's appetite resets.\n"
+                                        "Reply with \"yes\" to boost."
+                                        .format(author.mention, t_heist))
+                        boost_reply = await self.bot.wait_for_message(author=author)
+                        if boost_reply.content.lower().strip() == "yes":
+                            # activate boost!
+                            old_success = settings["Targets"][target]["Success"]
+                            settings["Targets"][target]["Success"] = 100 # changed back later
+                            settings["Targets"][target]["Vault"] *= 2 # double vault
+                            parrot.heist_boost_available(server, author, False) # have Parrot remember that
+                                                                                # the user used the command
+                                                                                # and can't use it again
+                            await self.bot.say("Boost activated!")
+                        else:
+                            await self.bot.say("Boost not used.")
+                else:
+                    perched_id = None
 
                 settings["Config"]["Heist Start"] = True
                 players = [server.get_member(x) for x in settings["Crew"]]
@@ -822,13 +825,13 @@ class Heist:
         self.award_credits(deposits)
         return credit_data
 
-    def game_outcomes(self, settings, players, target, perched_id):
+    def game_outcomes(self, settings, players, target, perched_id=None):
         success_rate = settings["Targets"][target]["Success"]
         good_out, bad_out = self.get_theme(settings)
         results = []
         for player in players:
             # PERCH MODIFICATION
-            if player.id == perched_id:
+            if perched_id and player.id == perched_id:
                 chance = 1
             else:
                 chance = random.randint(1, 100)
