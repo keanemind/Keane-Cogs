@@ -308,7 +308,7 @@ class Parrot:
             return await self.bot.say("Parrot needs to be perched on you to use this command. "
                                       "Use `{}help parrot` for more information.".format(ctx.prefix)) # NEW
         if self.save_file["Servers"][server.id]["Feeders"][ctx.message.author.id]["AirhornUses"] >= 3: # NEW
-            return await self.bot.say("You have already used steal 3 times. You must wait until "
+            return await self.bot.say("You have already used airhorn 3 times. You must wait until "
                                       "Parrot's fullness resets, and be perched on by him again.") # NEW
 
         audio = self.bot.get_cog('Audio') # NEW
