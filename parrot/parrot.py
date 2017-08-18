@@ -252,7 +252,7 @@ class Parrot:
         elif not bank.account_exists(target):
             error_msg = "Your target doesn't have a bank account to steal credits from."
 
-        elif target.id in feeders:
+        elif target.id in feeders and feeders[target.id]["PelletsFed"] > 0:
             error_msg = ("Parrot refuses to steal from someone "
                          "who has fed him in the current fullness cycle.")
         elif target.id in feeders[ctx.message.author.id]["StolenFrom"]:
@@ -450,10 +450,15 @@ class Parrot:
         feeders = self.save_file["Servers"][server.id]["Feeders"]
         parrot = self.save_file["Servers"][server.id]["Parrot"]
 
-        if not feeders:
+        # The first perched user of the day is in feeders
+        # but may not have fed any pellets. If so, ignore them.
+        fedparrot = [feederid for feederid in feeders
+                     if feeders[feederid]["PelletsFed"] > 0]
+
+        if not fedparrot:
             return await self.bot.say("```Nobody has fed Parrot yet.```")
 
-        idlist = sorted(list(feeders),
+        idlist = sorted(fedparrot,
                         key=(lambda idnum: feeders[idnum]["PelletsFed"]),
                         reverse=True)
 
@@ -645,8 +650,8 @@ class Parrot:
             perched_users = [feederid for feederid in feeders
                              if round(feeders[feederid]["CreditsCollected"]) > 0]
             if not perched_users:
-                continue # nobody got perched on, skip this server
-            ranked = sorted(list(perched_users),
+                continue # nobody gets credits, skip this server
+            ranked = sorted(perched_users,
                             key=lambda idnum: feeders[idnum]["CreditsCollected"],
                             reverse=True)
             max_creds_len = len(str(round(feeders[ranked[0]]["CreditsCollected"])))
