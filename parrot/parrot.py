@@ -138,7 +138,7 @@ class Parrot:
         Spend your credits to feed Parrot pellets using the "{prefix}feed" command,
         and find out how full Parrot is or what his appetite is by using the "{prefix}parrot info" command.
 
-        Every 20 minutes, Parrot perches on the shoulder of a random user who has fed him.
+        Every so often, Parrot perches on the shoulder of a random user who has fed him.
         The fraction of Parrot's appetite that you have fed is your chance of being perched on by Parrot.
 
         In return for providing your shoulder to him, Parrot will help you and give you powers.
