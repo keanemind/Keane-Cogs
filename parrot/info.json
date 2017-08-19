@@ -1,6 +1,6 @@
 {
     "AUTHOR" : "Keane Nguyen",
-    "INSTALL_MSG" : "Thanks for adding my cog to your bot. Currently, the cog refers to the bot as Parrot, and has a simple feeding feature. By default, server members must pay credits to feed Parrot to at least 50% full or else Parrot will die and automatically leave the server. If you want to customize this cog, you can modify the source code manually. Please take a look at the license for my cogs in my Github repository.",
+    "INSTALL_MSG" : "Thanks for adding my cog to your bot. Some of this cog's commands require that the Audio and Economy cogs are loaded. Currently, the cog refers to the bot as Parrot, and has a simple feeding feature. By default, server members must pay credits to feed Parrot to at least 50% full or else Parrot will die and automatically leave the server. If you want to customize this cog, you can modify the source code manually. Please take a look at the license for my cogs in my Github repository.",
     "NAME" : "Parrot",
     "SHORT" : "Require users to feed the Parrot or else the bot will leave",
     "DESCRIPTION" : "This cog currently refers to your bot as Parrot, and has a simple feeding feature. The Parrot's appetite is randomly chosen every day using a normal distribution and will be between 30 and 70. By default, server members must pay credits to feed Parrot to at least 50% full or else Parrot will die and automatically leave the server.",
