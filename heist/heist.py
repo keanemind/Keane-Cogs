@@ -523,6 +523,7 @@ class Heist:
             else:
                 crew = len(settings["Crew"])
                 target = self.heist_target(settings, crew)
+                settings["Config"]["Heist Start"] = True
 
                 # BOOST MODIFICATION
                 parrot = self.bot.get_cog('Parrot')
@@ -531,11 +532,11 @@ class Heist:
                     if (author.id == perched_id
                             and parrot.heist_boost_available(server, author)):
                         await self.bot.say("{} You have Parrot with you. Would you like to boost "
-                                        "this {} to increase success chance to 100% and double "
-                                        "earnings for all crew? You can only use this once until "
-                                        "Parrot's appetite resets.\n"
-                                        "Reply with \"yes\" to boost."
-                                        .format(author.mention, t_heist))
+                                           "this {} to increase success chance to 100% and double "
+                                           "earnings for all crew? You can only use this once until "
+                                           "Parrot's appetite resets.\n"
+                                           "Reply with \"yes\" to boost."
+                                           .format(author.mention, t_heist))
                         boost_reply = await self.bot.wait_for_message(author=author)
                         if boost_reply.content.lower().strip() == "yes":
                             # activate boost!
@@ -551,7 +552,6 @@ class Heist:
                 else:
                     perched_id = None
 
-                settings["Config"]["Heist Start"] = True
                 players = [server.get_member(x) for x in settings["Crew"]]
                 results = self.game_outcomes(settings, players, target, perched_id) # PERCH MODIFICATION
                 start_output = self.message_handler(settings, crew, players)
