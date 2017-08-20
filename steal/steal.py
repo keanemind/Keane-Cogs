@@ -79,11 +79,11 @@ class Steal:
             if response is None or response.content not in {"1", "2", "3"}:
                 loop = False
             elif response.content == "1":
-                loop = await self.steal_menu(response, server)
+                loop = await self.steal_menu(player, response.channel, server)
             elif response.content == "2":
-                loop = await self.upgrade_menu(response, server)
+                loop = await self.upgrade_menu(player, response.channel, server)
             elif response.content == "3":
-                loop = await self.activate_menu(response, server)
+                loop = await self.activate_menu(player, response.channel, server)
 
             if loop:
                 await asyncio.sleep(2)
@@ -92,10 +92,8 @@ class Steal:
 
         return await self.bot.send_message(player, "Goodbye!")
 
-    async def steal_menu(self, response, server):
+    async def steal_menu(self, player, channel, server):
         """Steal from someone."""
-        player = server.get_member(response.author.id)
-
         while True:
             message = ("Who do you want to steal from? The user must be on the "
                        "server you used `!steal` in. Enter a nickname, username, "
@@ -104,7 +102,7 @@ class Steal:
 
             response = await self.bot.wait_for_message(timeout=20,
                                                        author=player,
-                                                       channel=response.channel)
+                                                       channel=channel)
             if response is None:
                 return False
 
@@ -117,7 +115,7 @@ class Steal:
 
                 response = await self.bot.wait_for_message(timeout=20,
                                                            author=player,
-                                                           channel=response.channel)
+                                                           channel=channel)
                 if response is None:
                     return False
                 elif response.content != "1":
@@ -131,7 +129,7 @@ class Steal:
 
                 response = await self.bot.wait_for_message(timeout=20,
                                                            author=player,
-                                                           channel=response.channel)
+                                                           channel=channel)
                 if response is None:
                     return False
                 elif response.content == "1":
@@ -143,9 +141,8 @@ class Steal:
 
         return True
 
-    async def upgrade_menu(self, response, server):
+    async def upgrade_menu(self, player, channel, server):
         """Buy an upgrade."""
-        player = server.get_member(response.author.id)
         bank = self.bot.get_cog("Economy").bank
 
         playersave = self.save_file["Servers"][server.id]["Players"][player.id]
@@ -160,7 +157,7 @@ class Steal:
 
         response = await self.bot.wait_for_message(timeout=20,
                                                    author=player,
-                                                   channel=response.channel)
+                                                   channel=channel)
         if response is None:
             return False
         elif response.content not in {"1", "2", "3"}:
@@ -180,7 +177,7 @@ class Steal:
 
         response = await self.bot.wait_for_message(timeout=20,
                                                    author=player,
-                                                   channel=response.channel)
+                                                   channel=channel)
         if response is None:
             return False
         try:
@@ -205,7 +202,7 @@ class Steal:
 
         response = await self.bot.wait_for_message(timeout=20,
                                                    author=player,
-                                                   channel=response.channel)
+                                                   channel=channel)
         if response is None or response.content.lower() != "yes":
             await self.bot.send_message(player, "Upgrade cancelled.")
             return True
@@ -233,9 +230,8 @@ class Steal:
 
         return True
 
-    async def activate_menu(self, response, server):
+    async def activate_menu(self, player, channel, server):
         """Activate an upgrade path."""
-        player = server.get_member(response.author.id)
 
         return True
 
