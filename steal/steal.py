@@ -19,7 +19,7 @@ SERVER_DEFAULT = {
 }
 
 PLAYER_DEFAULT = {
-    "Active": "",
+    "Active": "AS",
     "ER": 0,
     "AS": 0,
     "BF": 0,
@@ -52,8 +52,11 @@ class Steal:
                        "You can upgrade in multiple paths at once, but only one "
                        "upgrade path can be active at once. Activating an upgrade "
                        "path means turning on the benefits that path provides "
-                       "(and turning off the benefits your previous path provided).")
+                       "(and turning off the benefits your previous path provided).\n\n"
+                       "Right now, your active path is Advanced Security. Learn more "
+                       "about each path at ...")
             await self.bot.send_message(player, message)
+            await asyncio.sleep(2)
 
         # Menu
         await self.main_menu(player, server)
@@ -67,33 +70,34 @@ class Steal:
                    "Reply with the number of your choice, or with anything else to cancel.")
         d_message = await self.bot.send_message(player, message)
 
-        response = await self.bot.wait_for_message(timeout=15,
+        response = await self.bot.wait_for_message(timeout=20,
                                                    author=player,
                                                    channel=d_message.channel)
 
-        if response.content == "1":
+        if response is None or response.content not in {"1", "2", "3"}:
+            return await self.bot.send_message(player, "Goodbye!")
+        elif response.content == "1":
             await self.steal_menu(response, server)
         elif response.content == "2":
             await self.upgrade_menu(response, server)
         elif response.content == "3":
             await self.activate_menu(response, server)
-        else:
-            await self.bot.send_message(player, "Goodbye!")
 
     async def steal_menu(self, response, server):
         """Steal from someone."""
-        player = response.author
+        player = server.get_member(response.author.id)
 
         while True:
-            chosen = False
             message = ("Who do you want to steal from? The user must be on the "
                        "server you used `!steal` in. Enter a nickname, username, "
                        "or for best results, a full tag like Keane#8251.")
             await self.bot.send_message(player, message)
 
-            response = await self.bot.wait_for_message(timeout=15,
+            response = await self.bot.wait_for_message(timeout=20,
                                                        author=player,
                                                        channel=response.channel)
+            if response is None:
+                return await self.bot.send_message(player, "Goodbye!")
 
             target = server.get_member_named(response.content)
 
@@ -102,11 +106,12 @@ class Steal:
                            "1. Yes\n")
                 await self.bot.send_message(player, message)
 
-                response = await self.bot.wait_for_message(timeout=15,
+                response = await self.bot.wait_for_message(timeout=20,
                                                            author=player,
                                                            channel=response.channel)
-
-                if response.content != "1":
+                if response is None:
+                    return await self.bot.send_message(player, "Goodbye!")
+                elif response.content != "1":
                     return await self.main_menu(player, server)
 
             elif "#" not in response.content:
@@ -114,24 +119,24 @@ class Steal:
                            "1. Yes\n".format(target.mention))
                 await self.bot.send_message(player, message)
 
-                response = await self.bot.wait_for_message(timeout=15,
+                response = await self.bot.wait_for_message(timeout=20,
                                                            author=player,
                                                            channel=response.channel)
-
-                if response.content == "1":
+                if response is None:
+                    return await self.bot.send_message(player, "Goodbye!")
+                elif response.content == "1":
                     break
             else:
                 break
 
-        # steal from target self.steal_credits(player, target)
-        # should need self.steal_credits(server.get_member(player.id), target)
+        # steal from target self.steal_credits(server.get_member(player.id), target)
 
         await asyncio.sleep(2)
         return await self.main_menu(player, server)
 
     async def upgrade_menu(self, response, server):
         """Buy an upgrade."""
-        player = response.author
+        player = server.get_member(response.author.id)
         bank = self.bot.get_cog("Economy").bank
 
         playersave = self.save_file["Servers"][server.id]["Players"][player.id]
@@ -144,11 +149,15 @@ class Steal:
                    .format(playersave["ER"], playersave["AS"], playersave["BF"]))
         await self.bot.send_message(player, message)
 
-        response = await self.bot.wait_for_message(timeout=15,
+        response = await self.bot.wait_for_message(timeout=20,
                                                    author=player,
                                                    channel=response.channel)
-        if response is None or response.content not in {"1", "2", "3"}:
-            return await self.bot.send_message(player, "Upgrade cancelled.")
+        if response is None:
+            return await self.bot.send_message(player, "Goodbye!")
+        elif response.content not in {"1", "2", "3"}:
+            await self.bot.send_message(player, "Upgrade cancelled.")
+            await asyncio.sleep(2)
+            return await self.main_menu(player, server)
 
         paths = {"1":"ER", "2":"AS", "3":"BF"}
         path = paths[response.content]
@@ -160,55 +169,66 @@ class Steal:
                    "with a non-number to cancel.")
         await self.bot.send_message(player, message)
 
-        response = await self.bot.wait_for_message(timeout=15,
+        response = await self.bot.wait_for_message(timeout=20,
                                                    author=player,
                                                    channel=response.channel)
         if response is None:
-            return await self.bot.send_message(player, "Upgrade cancelled.")
+            return await self.bot.send_message(player, "Goodbye!")
         try:
             lvls = int(response.content)
         except ValueError:
-            return await self.bot.send_message(player, "Upgrade cancelled.")
+            await self.bot.send_message(player, "Upgrade cancelled.")
+            await asyncio.sleep(2)
+            return await self.main_menu(player, server)
 
         current_lvl = playersave[path]
 
         if current_lvl + lvls > 99:
             lvls = 99 - current_lvl
-            cost = (5 * 99**1.933) - (5 * current_lvl**1.933)
+            cost = round((5 * 99**1.933) - (5 * current_lvl**1.933))
             await self.bot.send_message(player, "You cannot upgrade past lvl 99. You will only "
                                         "upgrade {} levels.".format(99 - current_lvl))
         else:
-            cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
+            cost = round((5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933))
 
         await self.bot.send_message(player, "This will cost {} credits. If you cannot afford the cost, "
                                     "the maximum number of levels you can afford will be upgraded. "
                                     "Reply with \"yes\" to confirm, or anything else to cancel.".format(cost))
 
+        response = await self.bot.wait_for_message(timeout=20,
+                                                   author=player,
+                                                   channel=response.channel)
+        if response is None or response.content.lower() != "yes":
+            await self.bot.send_message(player, "Upgrade cancelled.")
+            await asyncio.sleep(2)
+            return await self.main_menu(player, server)
+
         if not bank.can_spend(player, cost):
             balance = bank.get_balance(player)
             lvls = 1
-            cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
+            cost = round((5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933))
             while cost < balance:
                 lvls += 1
-                cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
+                cost = round((5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933))
 
             if lvls == 1:
                 return await self.bot.send_message(player, "You cannot afford to upgrade this path at all.")
             else:
                 lvls -= 1
-                cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
+                cost = round((5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933))
 
         bank.withdraw_credits(player, cost)
         playersave[path] += lvls
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
-        await self.bot.send_message("Upgrade complete.")
+        await self.bot.send_message(player, "Upgrade complete.")
 
         await asyncio.sleep(2)
         return await self.main_menu(player, server)
 
     async def activate_menu(self, response, server):
         """Activate an upgrade path."""
-        player = response.author
+        player = server.get_member(response.author.id)
 
         await asyncio.sleep(2)
         return await self.main_menu(player, server)
