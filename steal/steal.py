@@ -51,17 +51,14 @@ class Steal:
                        "There are three upgrade paths you can choose from. "
                        "You can upgrade in multiple paths at once, but only one "
                        "upgrade path can be active at once. Activating an upgrade "
-                       "path means turning on the benefits that path provides. "
-                       "Currently, you cannot steal or be stolen from. You can, "
-                       "however, upgrade as you please. The first time you activate "
-                       "a path, you will be able to steal and be stolen from. There "
-                       "is no going back after that.")
+                       "path means turning on the benefits that path provides "
+                       "(and turning off the benefits your previous path provided).")
             await self.bot.send_message(player, message)
 
         # Menu
-        await self.main_menu(player)
+        await self.main_menu(player, server)
 
-    async def main_menu(self, player):
+    async def main_menu(self, player, server):
         """Display the main menu."""
         message = ("What would you like to do?\n"
                    "1. Steal from someone\n"
@@ -75,23 +72,65 @@ class Steal:
                                                    channel=d_message.channel)
 
         if response.content == "1":
-            await self.steal_menu(response)
+            await self.steal_menu(response, server)
         elif response.content == "2":
-            await self.upgrade_menu(response)
+            await self.upgrade_menu(response, server)
         elif response.content == "3":
-            await self.activate_menu(response)
+            await self.activate_menu(response, server)
+        else:
+            await self.bot.send_message(player, "Goodbye!")
 
-    async def steal_menu(self, response):
+    async def steal_menu(self, response, server):
         """Steal from someone."""
-        server = response.server
         player = response.author
-        
-        await asyncio.sleep(2)
-        await self.main_menu(player)
 
-    async def upgrade_menu(self, response):
+        while True:
+            chosen = False
+            message = ("Who do you want to steal from? The user must be on the "
+                       "server you used `!steal` in. Enter a nickname, username, "
+                       "or for best results, a full tag like Keane#8251.")
+            await self.bot.send_message(player, message)
+
+            response = await self.bot.wait_for_message(timeout=15,
+                                                       author=player,
+                                                       channel=response.channel)
+
+            target = server.get_member_named(response.content)
+
+            if target is None:
+                message = ("Target not found. Try again?\n"
+                           "1. Yes\n")
+                await self.bot.send_message(player, message)
+
+                response = await self.bot.wait_for_message(timeout=15,
+                                                           author=player,
+                                                           channel=response.channel)
+
+                if response.content != "1":
+                    return await self.main_menu(player, server)
+
+            elif "#" not in response.content:
+                message = ("Is {} the correct target?\n"
+                           "1. Yes\n".format(target.mention))
+                await self.bot.send_message(player, message)
+
+                response = await self.bot.wait_for_message(timeout=15,
+                                                           author=player,
+                                                           channel=response.channel)
+
+                if response.content == "1":
+                    break
+            else:
+                break
+
+        # steal from target self.steal_credits(player, target)
+        # should need self.steal_credits(server.get_member(player.id), target)
+
+        await asyncio.sleep(2)
+        return await self.main_menu(player, server)
+
+    async def upgrade_menu(self, response, server):
         """Buy an upgrade."""
-        server = response.server
         player = response.author
         bank = self.bot.get_cog("Economy").bank
 
@@ -165,15 +204,14 @@ class Steal:
         await self.bot.send_message("Upgrade complete.")
 
         await asyncio.sleep(2)
-        await self.main_menu(player)
+        return await self.main_menu(player, server)
 
-    async def activate_menu(self, response):
+    async def activate_menu(self, response, server):
         """Activate an upgrade path."""
-        server = response.server
         player = response.author
-        
+
         await asyncio.sleep(2)
-        await self.main_menu(player)
+        return await self.main_menu(player, server)
 
 def dir_check():
     """Create a folder and save file for the cog if they don't exist."""
