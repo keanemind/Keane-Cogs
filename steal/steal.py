@@ -208,7 +208,9 @@ class Steal:
         response = await self.bot.wait_for_message(timeout=20,
                                                    author=player,
                                                    channel=channel)
-        if response is None or response.content.lower() != "yes":
+        if response is None:
+            return False
+        elif response.content.lower() != "yes":
             await self.bot.send_message(player, "Upgrade cancelled.")
             return True
 
