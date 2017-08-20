@@ -537,7 +537,7 @@ class Heist:
                                            "Parrot's appetite resets.\n"
                                            "Reply with \"yes\" to boost."
                                            .format(author.mention, t_heist))
-                        boost_reply = await self.bot.wait_for_message(author=author)
+                        boost_reply = await self.bot.wait_for_message(timeout=4, author=author)
                         if boost_reply.content.lower().strip() == "yes":
                             # activate boost!
                             old_success = settings["Targets"][target]["Success"]
