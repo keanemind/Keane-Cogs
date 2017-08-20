@@ -1,5 +1,6 @@
 """Finally, something for users to spend credits on!"""
 import os
+import asyncio
 
 import discord
 from discord.ext import commands
@@ -38,13 +39,12 @@ class Steal:
         server = ctx.message.server
         player = ctx.message.author
         servers = self.save_file["Servers"]
-        bank = self.bot.get_cog("Economy").bank
 
         # Add server
         if server.id not in servers:
             servers[server.id] = SERVER_DEFAULT
 
-        # Newbie introduction, add player
+        # Add player, display newbie introduction
         if player.id not in servers[server.id]["Players"]:
             servers[server.id]["Players"][player.id] = PLAYER_DEFAULT
             message = ("Welcome to the world of crime!\n"
@@ -54,11 +54,47 @@ class Steal:
                        "path means turning on the benefits that path provides. "
                        "Currently, you cannot steal or be stolen from. You can, "
                        "however, upgrade as you please. The first time you activate "
-                       "a pathway, you will be able to steal and be stolen from. There "
+                       "a path, you will be able to steal and be stolen from. There "
                        "is no going back after that.")
             await self.bot.send_message(player, message)
 
-        # Prompts
+        # Menu
+        await self.main_menu(player)
+
+    async def main_menu(self, player):
+        """Display the main menu."""
+        message = ("What would you like to do?\n"
+                   "1. Steal from someone\n"
+                   "2. Buy an upgrade\n"
+                   "3. Activate an upgrade path\n"
+                   "Reply with the number of your choice, or with anything else to cancel.")
+        d_message = await self.bot.send_message(player, message)
+
+        response = await self.bot.wait_for_message(timeout=15,
+                                                   author=player,
+                                                   channel=d_message.channel)
+
+        if response.content == "1":
+            await self.steal_menu(response)
+        elif response.content == "2":
+            await self.upgrade_menu(response)
+        elif response.content == "3":
+            await self.activate_menu(response)
+
+    async def steal_menu(self, response):
+        """Steal from someone."""
+        server = response.server
+        player = response.author
+        
+        await asyncio.sleep(2)
+        await self.main_menu(player)
+
+    async def upgrade_menu(self, response):
+        """Buy an upgrade."""
+        server = response.server
+        player = response.author
+        bank = self.bot.get_cog("Economy").bank
+
         playersave = self.save_file["Servers"][server.id]["Players"][player.id]
 
         message = ("What would you like to upgrade? Reply with the number "
@@ -69,41 +105,45 @@ class Steal:
                    .format(playersave["ER"], playersave["AS"], playersave["BF"]))
         await self.bot.send_message(player, message)
 
-        response = await self.bot.wait_for_message(timeout=15, author=player)
+        response = await self.bot.wait_for_message(timeout=15,
+                                                   author=player,
+                                                   channel=response.channel)
         if response is None or response.content not in {"1", "2", "3"}:
-            return await self.bot.say("Upgrade cancelled.")
+            return await self.bot.send_message(player, "Upgrade cancelled.")
 
         paths = {"1":"ER", "2":"AS", "3":"BF"}
         path = paths[response.content]
 
         if playersave[path] == 99:
-            return await self.bot.say("That path is already max level.")
+            return await self.bot.send_message(player, "That path is already max level.")
 
         message = ("How many levels would you like to upgrade? Respond "
                    "with a non-number to cancel.")
         await self.bot.send_message(player, message)
 
-        response = await self.bot.wait_for_message(timeout=15, author=player)
+        response = await self.bot.wait_for_message(timeout=15,
+                                                   author=player,
+                                                   channel=response.channel)
         if response is None:
-            return await self.bot.say("Upgrade cancelled.")
+            return await self.bot.send_message(player, "Upgrade cancelled.")
         try:
             lvls = int(response.content)
         except ValueError:
-            return await self.bot.say("Upgrade cancelled.")
+            return await self.bot.send_message(player, "Upgrade cancelled.")
 
         current_lvl = playersave[path]
 
         if current_lvl + lvls > 99:
             lvls = 99 - current_lvl
             cost = (5 * 99**1.933) - (5 * current_lvl**1.933)
-            await self.bot.say("You cannot upgrade past lvl 99. You will only "
-                               "upgrade {} levels.".format(99 - current_lvl))
+            await self.bot.send_message(player, "You cannot upgrade past lvl 99. You will only "
+                                        "upgrade {} levels.".format(99 - current_lvl))
         else:
             cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
 
-        await self.bot.say("This will cost {} credits. If you cannot afford the cost, "
-                           "the maximum number of levels you can afford will be upgraded. "
-                           "Reply with \"yes\" to confirm, or anything else to cancel.".format(cost))
+        await self.bot.send_message(player, "This will cost {} credits. If you cannot afford the cost, "
+                                    "the maximum number of levels you can afford will be upgraded. "
+                                    "Reply with \"yes\" to confirm, or anything else to cancel.".format(cost))
 
         if not bank.can_spend(player, cost):
             balance = bank.get_balance(player)
@@ -114,13 +154,26 @@ class Steal:
                 cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
 
             if lvls == 1:
-                return await self.bot.say("You cannot afford to upgrade this path at all.")
+                return await self.bot.send_message(player, "You cannot afford to upgrade this path at all.")
             else:
                 lvls -= 1
                 cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
 
         bank.withdraw_credits(player, cost)
         playersave[path] += lvls
+
+        await self.bot.send_message("Upgrade complete.")
+
+        await asyncio.sleep(2)
+        await self.main_menu(player)
+
+    async def activate_menu(self, response):
+        """Activate an upgrade path."""
+        server = response.server
+        player = response.author
+        
+        await asyncio.sleep(2)
+        await self.main_menu(player)
 
 def dir_check():
     """Create a folder and save file for the cog if they don't exist."""
