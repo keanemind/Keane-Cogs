@@ -59,10 +59,11 @@ class Steal:
             await asyncio.sleep(2)
 
         # Menu
-        await self.main_menu(player, server)
+        await self.main_menu(ctx)
 
-    async def main_menu(self, player, server):
+    async def main_menu(self, ctx):
         """Display the main menu."""
+        player = ctx.message.author
         loop = True
         while True:
             message = ("What would you like to do?\n"
@@ -79,11 +80,11 @@ class Steal:
             if response is None or response.content not in {"1", "2", "3"}:
                 loop = False
             elif response.content == "1":
-                loop = await self.steal_menu(player, response.channel, server)
+                loop = await self.steal_menu(ctx, response.channel)
             elif response.content == "2":
-                loop = await self.upgrade_menu(player, response.channel, server)
+                loop = await self.upgrade_menu(ctx, response.channel)
             elif response.content == "3":
-                loop = await self.activate_menu(player, response.channel, server)
+                loop = await self.activate_menu(ctx, response.channel)
 
             if loop:
                 await asyncio.sleep(2)
@@ -92,8 +93,10 @@ class Steal:
 
         return await self.bot.send_message(player, "Goodbye!")
 
-    async def steal_menu(self, player, channel, server):
+    async def steal_menu(self, ctx, channel):
         """Steal from someone."""
+        player = ctx.message.author
+        server = ctx.message.server
         while True:
             message = ("Who do you want to steal from? The user must be on the "
                        "server you used `!steal` in. Enter a nickname, username, "
@@ -141,8 +144,10 @@ class Steal:
 
         return True
 
-    async def upgrade_menu(self, player, channel, server):
+    async def upgrade_menu(self, ctx, channel):
         """Buy an upgrade."""
+        player = ctx.message.author
+        server = ctx.message.server
         bank = self.bot.get_cog("Economy").bank
 
         playersave = self.save_file["Servers"][server.id]["Players"][player.id]
@@ -230,7 +235,7 @@ class Steal:
 
         return True
 
-    async def activate_menu(self, player, channel, server):
+    async def activate_menu(self, ctx, channel):
         """Activate an upgrade path."""
 
         return True
