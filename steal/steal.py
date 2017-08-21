@@ -25,6 +25,12 @@ PLAYER_DEFAULT = {
     "BF": 0,
 }
 
+PRIMARY_UPGRADES = {
+    "ER":"Elite Raid",
+    "AS":"Advanced Security",
+    "BF":"Blackmarket Finances",
+}
+
 class Steal:
     """Upgrade yourself!"""
 
@@ -39,10 +45,17 @@ class Steal:
         server = ctx.message.server
         player = ctx.message.author
         servers = self.save_file["Servers"]
+        bank = self.bot.get_cog("Economy").bank
 
         # Add server
         if server.id not in servers:
             servers[server.id] = SERVER_DEFAULT
+
+        # Check for bank account
+        if not bank.account_exists(player):
+            return await self.bot.say("You don't have a bank account. "
+                                      "Use `{0}bank register` to open one, "
+                                      "then try `{0}steal` again.".format(ctx.prefix))
 
         # Add player, display newbie introduction
         if player.id not in servers[server.id]["Players"]:
@@ -153,11 +166,21 @@ class Steal:
         playersave = self.save_file["Servers"][server.id]["Players"][player.id]
 
         message = ("What would you like to upgrade? Reply with the number "
-                   "of your choice, or with anything else to cancel.\n"
-                   "1. Elite Raid (lvl {})\n"
-                   "2. Advanced Security (lvl {})\n"
-                   "3. Blackmarket Finances (lvl {})"
-                   .format(playersave["ER"], playersave["AS"], playersave["BF"]))
+                   "of your choice, or with anything else to cancel.\n")
+
+        zipped = zip(range(1, len(PRIMARY_UPGRADES) + 1), PRIMARY_UPGRADES)
+        options = [(num, key) for num, key in zipped]
+
+        for num, path in options:
+            message += "{}. {} (lvl {})".format(num,
+                                                PRIMARY_UPGRADES[path],
+                                                playersave[path])
+            if path == playersave["Active"]:
+                message += " *"
+
+            message += "\n"
+
+        message += "* currently active"
         await self.bot.send_message(player, message)
 
         response = await self.bot.wait_for_message(timeout=20,
@@ -165,11 +188,11 @@ class Steal:
                                                    channel=channel)
         if response is None:
             return False
-        elif response.content not in {"1", "2", "3"}:
+        elif response.content not in {str(num) for num in range(1, len(PRIMARY_UPGRADES) + 1)}:
             await self.bot.send_message(player, "Upgrade cancelled.")
             return True
 
-        paths = {"1":"ER", "2":"AS", "3":"BF"}
+        paths = {str(num):path for num, path in options}
         path = paths[response.content]
 
         if playersave[path] == 99:
@@ -239,7 +262,40 @@ class Steal:
 
     async def activate_menu(self, ctx, channel):
         """Activate an upgrade path."""
+        player = ctx.message.author
+        server = ctx.message.server
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
 
+        message = ("{} is currently active. Which path do you want to activate?\n"
+                   .format(PRIMARY_UPGRADES[playersave["Active"]]))
+
+        inactives = {key:PRIMARY_UPGRADES[key]
+                     for key in PRIMARY_UPGRADES
+                     if key != playersave["Active"]}
+        zipped = zip(range(1, len(inactives) + 1), inactives)
+        options = [(num, key) for num, key in zipped]
+
+        for num, pathkey in options:
+            message += "{}. {} (lvl {})\n".format(num,
+                                                  inactives[pathkey],
+                                                  playersave[pathkey])
+
+        await self.bot.send_message(player, message)
+
+        response = await self.bot.wait_for_message(timeout=20,
+                                                   author=player,
+                                                   channel=channel)
+        if response is None:
+            return False
+        elif response.content not in {str(num) for num in range(1, len(inactives) + 1)}:
+            await self.bot.send_message(player, "Activation cancelled.")
+            return True
+
+        paths = {str(num):pathkey for num, pathkey in options}
+        playersave["Active"] = paths[response.content]
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
+
+        await self.bot.send_message(player, "Activation complete.")
         return True
 
 def dir_check():
