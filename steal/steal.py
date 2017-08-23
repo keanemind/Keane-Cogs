@@ -1,6 +1,7 @@
 """Finally, something for users to spend credits on!"""
 import os
 import asyncio
+import random
 
 import discord
 from discord.ext import commands
@@ -153,7 +154,7 @@ class Steal:
             else:
                 break
 
-        # steal from target self.steal_credits(server.get_member(player.id), target)
+        await self.steal_credits(ctx, channel, target)
 
         return True
 
@@ -297,6 +298,234 @@ class Steal:
 
         await self.bot.send_message(player, "Activation complete.")
         return True
+
+    async def steal_credits(self, ctx, channel, target):
+        """Steal credits. Contains all the matchup logic."""
+        player = ctx.message.author
+        server = ctx.message.server
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
+        targetsave = self.save_file["Servers"][server.id]["Players"][target.id]
+
+        # Helldivers-like code thing
+        response = await self.bot.wait_for_message(timeout=20,
+                                                   author=player,
+                                                   channel=channel)
+
+        # ATTACKER: ELITE RAID
+        if playersave["Active"] == "ER":
+            # Elite Raid v Elite Raid
+            if targetsave["Active"] == "ER":
+                if random.randint(1, 100) <= 66:
+                    await self.er_steal(ctx, target)
+                else:
+                    await self.steal_failure(ctx)
+
+            # Elite Raid v Advanced Security
+            elif targetsave["Active"] == "AS":
+                if targetsave["AS"] == 99:
+                    success_chance = 33 / 2
+                else:
+                    success_chance = 33
+
+                if random.randint(1, 100) <= success_chance:
+                    await self.er_steal(ctx, target)
+                else:
+                    await self.steal_failure(ctx)
+
+                    bank = self.bot.get_cog("Economy").bank
+                    if random.randint(1, 100) <= targetsave["AS"]:
+                        bank.deposit_credits(target, 1000)
+
+                    # Elite Raid is immune to Advanced Security's cameras
+
+                if playersave["ER"] >= 66:
+                    if random.randint(1, 100) <= 33:
+                        if targetsave["AS"] > 5:
+                            targetsave["AS"] -= 5
+                        else:
+                            targetsave["AS"] = 0
+
+            # Elite Raid v Blackmarket Finances
+            elif targetsave["Active"] == "BF":
+                if random.randint(1, 100) <= 66:
+                    await self.er_steal(ctx, target)
+                else:
+                    await self.steal_failure(ctx)
+
+                if targetsave["BF"] >= 66:
+                    if random.randint(1, 100) <= 33:
+                        if playersave["ER"] > 5:
+                            playersave["ER"] -= 5
+                        else:
+                            playersave["ER"] = 0
+
+        # ATTACKER: ADVANCED SECURITY
+        elif playersave["Active"] == "AS":
+            # Advanced Security v Elite Raid
+            if targetsave["Active"] == "ER":
+                if random.randint(1, 100) <= 33:
+                    await self.regular_steal(ctx, target)
+                else:
+                    await self.steal_failure(ctx)
+
+            # Advanced Security v Advanced Security
+            elif targetsave["Active"] == "AS":
+                if targetsave["AS"] == 99:
+                    success_chance = 33 / 2
+                else:
+                    success_chance = 33
+
+                if random.randint(1, 100) <= success_chance:
+                    await self.regular_steal(ctx, target)
+                else:
+                    await self.steal_failure(ctx)
+
+                    bank = self.bot.get_cog("Economy").bank
+                    if random.randint(1, 100) <= targetsave["AS"]:
+                        bank.deposit_credits(target, 1000)
+
+                    if targetsave["AS"] >= 33:
+                        await self.reveal_attacker(ctx, target)
+
+            # Advanced Security v Blackmarket Finances
+            elif targetsave["Active"] == "BF":
+                if random.randint(1, 100) <= 33:
+                    await self.regular_steal(ctx, target)
+                else:
+                    await self.steal_failure(ctx)
+
+        # ATTACKER: BLACKMARKET FINANCES
+        elif playersave["Active"] == "BF":
+            # Blackmarket Finances v Elite Raid
+            if targetsave["Active"] == "ER":
+                if random.randint(1, 100) <= 50:
+                    await self.regular_steal(ctx, target)
+                else:
+                    await self.steal_failure(ctx)
+
+            # Blackmarket Finances v Advanced Security
+            elif targetsave["Active"] == "AS":
+                if targetsave["AS"] == 99:
+                    success_chance = 33 / 2
+                else:
+                    success_chance = 33
+
+                if random.randint(1, 100) <= success_chance:
+                    await self.regular_steal(ctx, target)
+                else:
+                    await self.steal_failure(ctx)
+
+                    bank = self.bot.get_cog("Economy").bank
+                    if random.randint(1, 100) <= targetsave["AS"]:
+                        bank.deposit_credits(target, 1000)
+
+                    if targetsave["AS"] >= 33:
+                        await self.reveal_attacker(ctx, target)
+
+                if targetsave["AS"] >= 66:
+                    if random.randint(1, 100) <= 33:
+                        if playersave["BF"] > 5:
+                            playersave["BF"] -= 5
+                        else:
+                            playersave["BF"] = 0
+
+            # Blackmarket Finances v Blackmarket Finances
+            elif targetsave["Active"] == "BF":
+                if random.randint(1, 100) <= 50:
+                    await self.regular_steal(ctx, target)
+                else:
+                    await self.steal_failure(ctx)
+
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
+        return True
+
+    async def er_steal(self, ctx, target):
+        """Elite Raid steal."""
+        player = ctx.message.author
+        server = ctx.message.server
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
+        bank = self.bot.get_cog("Economy").bank
+
+        if playersave["ER"] == 99:
+            # 1/10 chance to steal 110% of wealth, if steal successful in the first place
+            if random.randint(1, 100) <= 10:
+                amt_stolen = round(bank.get_balance(target) * 1.1)
+                bank.deposit_credits(player, amt_stolen)
+                bank.set_credits(target, 0)
+
+                message = ("You captured a good friend of {0}'s as hostage "
+                           "and demanded ransom, which was promptly paid. "
+                           "You graciously accepted every credit {0} had, "
+                           "plus some that the poor soul took out on a loan "
+                           "to meet your demands. All in all, you earned "
+                           "yourself {1} credits."
+                           .format(player.mention, amt_stolen))
+                await self.bot.send_message(player, message)
+                return
+
+        amt_stolen = random.randint(1, random.randint(1, 2000))
+
+        if random.randint(1, 100) <= playersave["ER"]:
+            amt_stolen *= 2
+
+        if playersave["ER"] >= 33:
+            # steal a bonus 10% of target's wealth
+            amt_stolen += round(bank.get_balance(target) * 0.1)
+
+        if amt_stolen > bank.get_balance(target):
+            amt_stolen = bank.get_balance(target)
+
+        bank.transfer_credits(target, player, amt_stolen)
+
+        message = ("Mission accomplished! You stole {} credits "
+                   "from {}!".format(amt_stolen, target.mention))
+        await self.bot.send_message(player, message)
+
+    async def regular_steal(self, ctx, target):
+        """Regular steal by classes other than Elite Raid."""
+        player = ctx.message.author
+
+        bank = self.bot.get_cog("Economy").bank
+        amt_stolen = random.randint(1, random.randint(1, 2000))
+        if amt_stolen > bank.get_balance(target):
+            amt_stolen = bank.get_balance(target)
+
+        bank.transfer_credits(target, player, amt_stolen)
+
+        message = ("Mission accomplished! You stole {} credits "
+                   "from {}!".format(amt_stolen, target.mention))
+        await self.bot.send_message(player, message)
+
+    async def reveal_attacker(self, ctx, target):
+        """Reveal to the defender who attacked them and what the
+        attacker had active."""
+        player = ctx.message.author
+        server = ctx.message.server
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
+        message = (
+            "{}, who had {} active, was spotted by your guard "
+            "stealing credits from your bank safe! Your guard "
+            "was unable to catch the fiend before they fled."
+            .format(player.mention, PRIMARY_UPGRADES[playersave["Active"]])
+        )
+        await self.bot.send_message(target, message)
+
+    async def steal_failure(self, ctx):
+        """Send a steal failure message to the person who attempted it."""
+        player = ctx.message.author
+        messages = [
+            ("Right as you're about to open the safe, you hear footsteps. "
+             "You and your team flee the scene."),
+            ("You pull hard on the door, making a loud clang, but it seems "
+             "to be jammed. Maybe there's some kind of hidden mechanism, but "
+             "guards may have heard you. You scram and and live to see another day."),
+            ("Something about this operation smells fishy. It might be a trap. "
+             "You call it off."),
+            ("There's nothing in the safe! Maybe its owner knew you were coming?"),
+            ("What in the world!? Two armed guards jump out at you. You and the "
+             "team run like the wind and barely get out with your heads on your necks.")
+        ]
+        await self.bot.send_message(player, random.choice(messages))
 
 def dir_check():
     """Create a folder and save file for the cog if they don't exist."""
