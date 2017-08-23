@@ -468,7 +468,6 @@ class Steal:
                     await self.steal_failure(ctx)
 
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
-        return True
 
     async def er_steal(self, ctx, target):
         """Elite Raid steal."""
