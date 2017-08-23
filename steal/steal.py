@@ -554,7 +554,8 @@ class Steal:
             ("What in the world!? Two armed guards jump out at you. You and the "
              "team run like the wind and barely get out with your heads on your necks.")
         ]
-        await self.bot.send_message(player, random.choice(messages))
+        message = random.choice(messages) + "\n**Steal failed.**"
+        await self.bot.send_message(player, message)
 
 def dir_check():
     """Create a folder and save file for the cog if they don't exist."""
