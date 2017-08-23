@@ -96,11 +96,11 @@ class Steal:
             if response is None or response.content not in {"1", "2", "3"}:
                 loop = False
             elif response.content == "1":
-                loop = await self.steal_menu(ctx, response.channel)
+                loop = await self.steal_menu(ctx)
             elif response.content == "2":
-                loop = await self.upgrade_menu(ctx, response.channel)
+                loop = await self.upgrade_menu(ctx)
             elif response.content == "3":
-                loop = await self.activate_menu(ctx, response.channel)
+                loop = await self.activate_menu(ctx)
 
             if loop:
                 await asyncio.sleep(2)
@@ -109,7 +109,7 @@ class Steal:
 
         return await self.bot.send_message(player, "Goodbye!")
 
-    async def steal_menu(self, ctx, channel):
+    async def steal_menu(self, ctx):
         """Steal from someone."""
         player = ctx.message.author
         server = ctx.message.server
@@ -118,11 +118,11 @@ class Steal:
             message = ("Who do you want to steal from? The user must be on the "
                        "server you used `!steal` in. Enter a nickname, username, "
                        "or for best results, a full tag like Keane#8251.")
-            await self.bot.send_message(player, message)
+            d_message = await self.bot.send_message(player, message)
 
             response = await self.bot.wait_for_message(timeout=60,
                                                        author=player,
-                                                       channel=channel)
+                                                       channel=d_message.channel)
             if response is None:
                 return False
 
@@ -135,7 +135,7 @@ class Steal:
 
                 response = await self.bot.wait_for_message(timeout=20,
                                                            author=player,
-                                                           channel=channel)
+                                                           channel=d_message.channel)
                 if response is None:
                     return False
                 elif response.content != "1":
@@ -149,7 +149,7 @@ class Steal:
 
                 response = await self.bot.wait_for_message(timeout=20,
                                                            author=player,
-                                                           channel=channel)
+                                                           channel=d_message.channel)
                 if response is None:
                     return False
                 elif response.content == "1":
@@ -165,11 +165,11 @@ class Steal:
             self.save_file["Servers"][server.id]["Players"][target.id] = PLAYER_DEFAULT
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
-        await self.steal_credits(ctx, channel, target)
+        await self.steal_credits(ctx, target)
 
         return True
 
-    async def upgrade_menu(self, ctx, channel):
+    async def upgrade_menu(self, ctx):
         """Buy an upgrade."""
         player = ctx.message.author
         server = ctx.message.server
@@ -193,11 +193,11 @@ class Steal:
             message += "\n"
 
         message += "* currently active"
-        await self.bot.send_message(player, message)
+        d_message = await self.bot.send_message(player, message)
 
         response = await self.bot.wait_for_message(timeout=60,
                                                    author=player,
-                                                   channel=channel)
+                                                   channel=d_message.channel)
         if response is None:
             return False
         elif response.content not in {str(num) for num in range(1, len(PRIMARY_UPGRADES) + 1)}:
@@ -217,7 +217,7 @@ class Steal:
 
         response = await self.bot.wait_for_message(timeout=20,
                                                    author=player,
-                                                   channel=channel)
+                                                   channel=d_message.channel)
         if response is None:
             return False
         try:
@@ -242,7 +242,7 @@ class Steal:
 
         response = await self.bot.wait_for_message(timeout=20,
                                                    author=player,
-                                                   channel=channel)
+                                                   channel=d_message.channel)
         if response is None:
             return False
         elif response.content.lower() != "yes":
@@ -272,7 +272,7 @@ class Steal:
 
         return True
 
-    async def activate_menu(self, ctx, channel):
+    async def activate_menu(self, ctx):
         """Activate an upgrade path."""
         player = ctx.message.author
         server = ctx.message.server
@@ -292,11 +292,11 @@ class Steal:
                                                   inactives[pathkey],
                                                   playersave[pathkey])
 
-        await self.bot.send_message(player, message)
+        d_message = await self.bot.send_message(player, message)
 
         response = await self.bot.wait_for_message(timeout=60,
                                                    author=player,
-                                                   channel=channel)
+                                                   channel=d_message.channel)
         if response is None:
             return False
         elif response.content not in {str(num) for num in range(1, len(inactives) + 1)}:
@@ -310,7 +310,7 @@ class Steal:
         await self.bot.send_message(player, "Activation complete.")
         return True
 
-    async def steal_credits(self, ctx, channel, target):
+    async def steal_credits(self, ctx, target):
         """Steal credits. Contains all the matchup logic."""
         player = ctx.message.author
         server = ctx.message.server
@@ -329,10 +329,10 @@ class Steal:
         for _ in range(13):
             code.append(str(random.randint(0, 9)))
         message = "-".join(code)
-        await self.bot.send_message(player, message)
+        d_message = await self.bot.send_message(player, message)
         response = await self.bot.wait_for_message(timeout=15,
                                                    author=player,
-                                                   channel=channel,
+                                                   channel=d_message.channel,
                                                    content="".join(code))
 
         if response is None:
