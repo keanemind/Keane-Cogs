@@ -39,6 +39,8 @@ class Steal:
         self.save_file = dataIO.load_json(SAVE_FILEPATH)
         self.bot = bot
 
+        self.menu_users = [] # list is probably inefficient
+
     @commands.command(pass_context=True, no_pm=True)
     async def steal(self, ctx):
         """Steal's main menu. Everything you can do with this cog
@@ -57,8 +59,14 @@ class Steal:
             return await self.bot.say("You don't have a bank account. "
                                       "Use `{0}bank register` to open one, "
                                       "then try `{0}steal` again.".format(ctx.prefix))
-        else:
-            await self.bot.say("Check your direct messages.")
+
+        # Check if main_menu is already running for them
+        if player.id in self.menu_users:
+            return await self.bot.say("The command is already running for you. "
+                                      "Check your direct messages.")
+
+        await self.bot.say("Check your direct messages.")
+        self.menu_users.append(player.id)
 
         # Add player, display newbie introduction
         if player.id not in servers[server.id]["Players"]:
@@ -76,6 +84,7 @@ class Steal:
 
         # Menu
         await self.main_menu(ctx)
+        self.menu_users.remove(player.id)
 
     async def main_menu(self, ctx):
         """Display the main menu."""
@@ -107,7 +116,7 @@ class Steal:
             else:
                 break
 
-        return await self.bot.send_message(player, "Goodbye!")
+        await self.bot.send_message(player, "Goodbye!")
 
     async def steal_menu(self, ctx):
         """Steal from someone."""
