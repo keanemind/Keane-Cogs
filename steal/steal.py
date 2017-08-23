@@ -57,6 +57,8 @@ class Steal:
             return await self.bot.say("You don't have a bank account. "
                                       "Use `{0}bank register` to open one, "
                                       "then try `{0}steal` again.".format(ctx.prefix))
+        else:
+            await self.bot.say("Check your direct messages.")
 
         # Add player, display newbie introduction
         if player.id not in servers[server.id]["Players"]:
