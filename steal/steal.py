@@ -87,7 +87,7 @@ class Steal:
                        "Reply with the number of your choice, or with anything else to cancel.")
             d_message = await self.bot.send_message(player, message)
 
-            response = await self.bot.wait_for_message(timeout=20,
+            response = await self.bot.wait_for_message(timeout=60,
                                                        author=player,
                                                        channel=d_message.channel)
 
@@ -117,7 +117,7 @@ class Steal:
                        "or for best results, a full tag like Keane#8251.")
             await self.bot.send_message(player, message)
 
-            response = await self.bot.wait_for_message(timeout=20,
+            response = await self.bot.wait_for_message(timeout=60,
                                                        author=player,
                                                        channel=channel)
             if response is None:
@@ -184,7 +184,7 @@ class Steal:
         message += "* currently active"
         await self.bot.send_message(player, message)
 
-        response = await self.bot.wait_for_message(timeout=20,
+        response = await self.bot.wait_for_message(timeout=60,
                                                    author=player,
                                                    channel=channel)
         if response is None:
@@ -283,7 +283,7 @@ class Steal:
 
         await self.bot.send_message(player, message)
 
-        response = await self.bot.wait_for_message(timeout=20,
+        response = await self.bot.wait_for_message(timeout=60,
                                                    author=player,
                                                    channel=channel)
         if response is None:
@@ -307,9 +307,31 @@ class Steal:
         targetsave = self.save_file["Servers"][server.id]["Players"][target.id]
 
         # Helldivers-like code thing
-        response = await self.bot.wait_for_message(timeout=20,
+        message = ("Quick! You have 15 seconds to unlock the "
+                   "door's keypad to get inside! Type the code "
+                   "below without the dashes. Keep trying until "
+                   "you're in or time is up.\n")
+        await self.bot.send_message(player, message)
+        await asyncio.sleep(3)
+        code = []
+        for _ in range(13):
+            code.append(str(random.randint(0, 9)))
+        message = "-".join(code)
+        await self.bot.send_message(player, message)
+        response = await self.bot.wait_for_message(timeout=15,
                                                    author=player,
-                                                   channel=channel)
+                                                   channel=channel,
+                                                   content="".join(code))
+
+        if response is None:
+            await self.bot.send_message(player, "You failed!")
+            if targetsave["Active"] == "AS" and random.randint(1, 100) <= targetsave["AS"]:
+                bank = self.bot.get_cog("Economy").bank
+                bank.deposit_credits(target, 1000)
+            return True
+        else:
+            await self.bot.send_message(player, "You're in!")
+            await asyncio.sleep(1)
 
         # ATTACKER: ELITE RAID
         if playersave["Active"] == "ER":
