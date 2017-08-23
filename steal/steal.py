@@ -111,6 +111,7 @@ class Steal:
         """Steal from someone."""
         player = ctx.message.author
         server = ctx.message.server
+        bank = self.bot.get_cog("Economy").bank
         while True:
             message = ("Who do you want to steal from? The user must be on the "
                        "server you used `!steal` in. Enter a nickname, username, "
@@ -153,6 +154,14 @@ class Steal:
                     break
             else:
                 break
+
+        if not bank.account_exists(target):
+            await self.bot.send_message(player, "That person doesn't have a bank account.")
+            return True
+
+        if target.id not in self.save_file["Servers"][server.id]["Players"]:
+            self.save_file["Servers"][server.id]["Players"][target.id] = PLAYER_DEFAULT
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
         await self.steal_credits(ctx, channel, target)
 
