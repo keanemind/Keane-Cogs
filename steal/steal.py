@@ -316,6 +316,7 @@ class Steal:
         server = ctx.message.server
         playersave = self.save_file["Servers"][server.id]["Players"][player.id]
         targetsave = self.save_file["Servers"][server.id]["Players"][target.id]
+        bank = self.bot.get_cog("Economy").bank
 
         # Helldivers-like code thing
         message = ("Quick! You have 15 seconds to unlock the "
@@ -337,7 +338,6 @@ class Steal:
         if response is None:
             await self.bot.send_message(player, "You failed!")
             if targetsave["Active"] == "AS" and random.randint(1, 100) <= targetsave["AS"]:
-                bank = self.bot.get_cog("Economy").bank
                 bank.deposit_credits(target, 1000)
             return True
         else:
@@ -365,7 +365,6 @@ class Steal:
                 else:
                     await self.steal_failure(ctx)
 
-                    bank = self.bot.get_cog("Economy").bank
                     if random.randint(1, 100) <= targetsave["AS"]:
                         bank.deposit_credits(target, 1000)
 
@@ -413,7 +412,6 @@ class Steal:
                 else:
                     await self.steal_failure(ctx)
 
-                    bank = self.bot.get_cog("Economy").bank
                     if random.randint(1, 100) <= targetsave["AS"]:
                         bank.deposit_credits(target, 1000)
 
@@ -448,7 +446,6 @@ class Steal:
                 else:
                     await self.steal_failure(ctx)
 
-                    bank = self.bot.get_cog("Economy").bank
                     if random.randint(1, 100) <= targetsave["AS"]:
                         bank.deposit_credits(target, 1000)
 
