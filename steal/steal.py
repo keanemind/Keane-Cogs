@@ -459,7 +459,7 @@ class Steal:
                            "plus some that the poor soul took out on a loan "
                            "to meet your demands. All in all, you earned "
                            "yourself {1} credits."
-                           .format(player.mention, amt_stolen))
+                           .format(target.mention, amt_stolen))
                 await self.bot.send_message(player, message)
                 return
 
