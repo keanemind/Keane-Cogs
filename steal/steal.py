@@ -2,6 +2,7 @@
 import os
 import asyncio
 import random
+import time
 
 import discord
 from discord.ext import commands
@@ -24,6 +25,7 @@ PLAYER_DEFAULT = {
     "ER": 0,
     "AS": 0,
     "BF": 0,
+    "LatestSteal": 0, # The time that the user last attempted to steal, assigned to dummy value
 }
 
 PRIMARY_UPGRADES = {
@@ -89,6 +91,9 @@ class Steal:
     async def main_menu(self, ctx):
         """Display the main menu."""
         player = ctx.message.author
+        server = ctx.message.server
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
+
         loop = True
         while True:
             message = ("What would you like to do?\n"
@@ -105,7 +110,15 @@ class Steal:
             if response is None or response.content not in {"1", "2", "3"}:
                 loop = False
             elif response.content == "1":
-                loop = await self.steal_menu(ctx)
+                since_steal = round(time.time() - playersave["LatestSteal"])
+                if since_steal > 20 * 60:
+                    loop = await self.steal_menu(ctx)
+                else:
+                    until_available = (20 * 60) - since_steal
+                    m, s = divmod(until_available, 60)
+                    h, m = divmod(m, 60)
+                    message = "Steal is on cooldown. Time left: {:d}:{:02d}:{:02d}".format(h, m, s)
+                    await self.bot.send_message(player, message)
             elif response.content == "2":
                 loop = await self.upgrade_menu(ctx)
             elif response.content == "3":
@@ -475,6 +488,7 @@ class Steal:
                 else:
                     await self.steal_failure(ctx)
 
+        playersave["LatestSteal"] = time.time()
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     async def er_steal(self, ctx, target):
