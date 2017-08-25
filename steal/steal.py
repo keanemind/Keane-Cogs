@@ -1,4 +1,4 @@
-"""Finally, something for users to spend credits on!"""
+"""A cog allowing users to steal credits from each other."""
 import os
 import asyncio
 import copy
@@ -42,7 +42,7 @@ PRIMARY_UPGRADES = {
 }
 
 class Steal:
-    """Upgrade yourself!"""
+    """Steal credits from other users and spend credits on upgrades."""
 
     def __init__(self, bot):
         self.save_file = dataIO.load_json(SAVE_FILEPATH)
