@@ -639,10 +639,10 @@ class Steal:
             last_given = datetime.datetime.strptime(self.save_file["Global"]["CreditsGivenTime"],
                                                     "%Y-%m-%dT%H:%M:%S.%f")
             if last_given.hour == now.hour and last_given.date() == now.date():
-                next_time = now.replace(hour=now.hour + 1,
-                                        minute=random.randint(0, 59),
-                                        second=random.randint(1, 59),
-                                        microsecond=0)
+                next_time = now + datetime.timedelta(hours=1)
+                next_time = next_time.replace(minute=random.randint(0, 59),
+                                              second=random.randint(1, 59),
+                                              microsecond=0)
                 # If next_time is X:00:00 and the sleep below is slightly short,
                 # the hour will still be the previous hour and credits could be given
                 # twice in the same hour. To be safe, the minimum second is 1.
