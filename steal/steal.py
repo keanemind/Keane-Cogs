@@ -3,6 +3,7 @@ import os
 import asyncio
 import random
 import time
+import datetime
 
 import discord
 from discord.ext import commands
@@ -17,7 +18,9 @@ SAVE_DEFAULT = {
 }
 
 SERVER_DEFAULT = {
-    "Players": {}
+    "Players": {},
+    "TheftCount": 0, # Reset daily by daily_report()
+    "Thieves": [], # Reset daily by daily_report()
 }
 
 PLAYER_DEFAULT = {
@@ -42,6 +45,9 @@ class Steal:
         self.bot = bot
 
         self.menu_users = [] # list is probably inefficient
+
+        self.loop_task = bot.loop.create_task(self.give_credits())
+        self.loop_task2 = bot.loop.create_task(self.daily_report())
 
     @commands.command(pass_context=True, no_pm=True)
     async def steal(self, ctx):
@@ -533,9 +539,17 @@ class Steal:
                    "from {}!".format(amt_stolen, target.mention))
         await self.bot.send_message(player, message)
 
+        # Add to daily report data
+        if player.id not in self.save_file["Servers"][server.id]["Thieves"]:
+            self.save_file["Servers"][server.id]["Thieves"].append(player.id)
+
+        self.save_file["Servers"][server.id]["TheftCount"] += 1
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
+
     async def regular_steal(self, ctx, target):
         """Regular steal by classes other than Elite Raid."""
         player = ctx.message.author
+        server = ctx.message.server
 
         bank = self.bot.get_cog("Economy").bank
         amt_stolen = random.randint(1, random.randint(1, 2000))
@@ -547,6 +561,13 @@ class Steal:
         message = ("Mission accomplished! You stole {} credits "
                    "from {}!".format(amt_stolen, target.mention))
         await self.bot.send_message(player, message)
+
+        # Add to daily report data
+        if player.id not in self.save_file["Servers"][server.id]["Thieves"]:
+            self.save_file["Servers"][server.id]["Thieves"].append(player.id)
+
+        self.save_file["Servers"][server.id]["TheftCount"] += 1
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     async def reveal_attacker(self, ctx, target):
         """Reveal to the defender who attacked them and what the
@@ -579,6 +600,58 @@ class Steal:
         ]
         message = random.choice(messages) + "\n**Steal failed.**"
         await self.bot.send_message(player, message)
+
+    async def give_credits(self):
+        """Loop to give credits every hour at a random minute and second
+        to Blackmarket Finances users."""
+        while True:
+            bank = self.bot.get_cog("Economy").bank
+            now = datetime.datetime.utcnow()
+            next_time = now.replace(hour=now.hour + 1,
+                                    minute=random.randint(0, 59),
+                                    second=random.randint(1, 59),
+                                    microsecond=0)
+            # If next_time is X:00:00 and the sleep below is slightly short,
+            # the hour will still be the previous hour and credits could be given
+            # twice in the same hour. To be safe, the minimum second is 1.
+            await asyncio.sleep((next_time - now).total_seconds())
+
+            for serverid in self.save_file["Servers"]:
+                server = self.bot.get_server(serverid)
+                for playerid in self.save_file["Servers"][serverid]["Players"]:
+                    playersave = self.save_file["Servers"][serverid]["Players"][playerid]
+                    if playersave["Active"] == "BF" and playersave["BF"] > 0:
+                        player = server.get_member(playerid)
+                        bank.deposit_credits(player, playersave["BF"])
+
+    async def daily_report(self):
+        """Loop to report theft every day."""
+        now = datetime.datetime.now()
+        wake_time = now.replace(hour=20, minute=0, second=0, microsecond=0)
+        if now.hour > wake_time.hour:
+            wake_time = wake_time + datetime.timedelta(days=1)
+
+        while True:
+            await asyncio.sleep((wake_time - datetime.datetime.now()).total_seconds())
+            wake_time = wake_time + datetime.timedelta(days=1)
+
+            for serverid in self.save_file["Servers"]:
+                serverdata = self.save_file["Servers"][serverid]
+                message = ("Announcement from the Royal Navy: \n"
+                           "Today there were {} counts of theft "
+                           "perpetrated by {} members of this server. "
+                           "The Royal Navy cautions all members to remain "
+                           "vigilant in these lawless times."
+                           .format(serverdata["TheftCount"], len(serverdata["Thieves"])))
+                await self.bot.send_message(self.bot.get_server(serverid), message)
+                serverdata["TheftCount"] = 0
+                serverdata["Thieves"].clear()
+
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
+
+    def __unload(self):
+        self.loop_task.cancel()
+        self.loop_task2.cancel()
 
 def dir_check():
     """Create a folder and save file for the cog if they don't exist."""
