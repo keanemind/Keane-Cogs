@@ -394,7 +394,7 @@ class Steal:
             await self.bot.send_message(player, "You failed!")
             if targetsave["Active"] == "AS" and random.randint(1, 100) <= targetsave["AS"]:
                 bank.deposit_credits(target, 1000)
-            return True
+            return
         else:
             await self.bot.send_message(player, "You're in!")
             await asyncio.sleep(1)
