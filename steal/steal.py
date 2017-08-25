@@ -61,6 +61,7 @@ class Steal:
         # Add server
         if server.id not in servers:
             servers[server.id] = SERVER_DEFAULT
+            # doesn't need save_json() because it'll be saved when player is added below
 
         # Check for bank account
         if not bank.account_exists(player):
@@ -79,6 +80,7 @@ class Steal:
         # Add player, display newbie introduction
         if player.id not in servers[server.id]["Players"]:
             servers[server.id]["Players"][player.id] = PLAYER_DEFAULT
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
             message = ("Welcome to the world of crime!\n"
                        "There are three upgrade paths you can choose from. "
                        "You can upgrade in multiple paths at once, but only one "
