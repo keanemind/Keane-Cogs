@@ -1,6 +1,7 @@
 """Finally, something for users to spend credits on!"""
 import os
 import asyncio
+import copy
 import random
 import time
 import datetime
@@ -60,7 +61,7 @@ class Steal:
 
         # Add server
         if server.id not in servers:
-            servers[server.id] = SERVER_DEFAULT
+            servers[server.id] = copy.deepcopy(SERVER_DEFAULT)
             # doesn't need save_json() because it'll be saved when player is added below
 
         # Check for bank account
@@ -79,7 +80,7 @@ class Steal:
 
         # Add player, display newbie introduction
         if player.id not in servers[server.id]["Players"]:
-            servers[server.id]["Players"][player.id] = PLAYER_DEFAULT
+            servers[server.id]["Players"][player.id] = copy.deepcopy(PLAYER_DEFAULT)
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
             message = ("Welcome to the world of crime!\n"
                        "There are three upgrade paths you can choose from. "
@@ -192,7 +193,7 @@ class Steal:
             return True
 
         if target.id not in self.save_file["Servers"][server.id]["Players"]:
-            self.save_file["Servers"][server.id]["Players"][target.id] = PLAYER_DEFAULT
+            self.save_file["Servers"][server.id]["Players"][target.id] = copy.deepcopy(PLAYER_DEFAULT)
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
         await self.steal_credits(ctx, target)
