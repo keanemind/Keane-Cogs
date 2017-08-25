@@ -264,11 +264,16 @@ class Steal:
 
         if current_lvl + lvls > 99:
             lvls = 99 - current_lvl
-            cost = round((5 * 99**1.933) - (5 * current_lvl**1.933))
+            cost = (5 * 99**1.933) - (5 * current_lvl**1.933)
             await self.bot.send_message(player, "You cannot upgrade past lvl 99. You will only "
                                         "upgrade {} levels.".format(99 - current_lvl))
         else:
-            cost = round((5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933))
+            cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
+
+        if playersave["BF"] == 99:
+            cost = round(cost / 2)
+        else:
+            cost = round(cost)
 
         await self.bot.send_message(player, "This will cost {} credits. If you cannot afford the cost, "
                                     "the maximum number of levels you can afford will be upgraded. "
@@ -286,17 +291,33 @@ class Steal:
         if not bank.can_spend(player, cost):
             balance = bank.get_balance(player)
             lvls = 1
-            cost = round((5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933))
+            cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
+
+            if playersave["BF"] == 99:
+                cost = round(cost / 2)
+            else:
+                cost = round(cost)
+
             while cost < balance:
                 lvls += 1
-                cost = round((5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933))
+                cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
+
+                if playersave["BF"] == 99:
+                    cost = round(cost / 2)
+                else:
+                    cost = round(cost)
 
             if lvls == 1:
                 await self.bot.send_message(player, "You cannot afford to upgrade this path at all.")
                 return True
             else:
                 lvls -= 1
-                cost = round((5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933))
+                cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
+
+                if playersave["BF"] == 99:
+                    cost = round(cost / 2)
+                else:
+                    cost = round(cost)
 
         bank.withdraw_credits(player, cost)
         playersave[path] += lvls
