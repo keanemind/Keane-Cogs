@@ -92,7 +92,7 @@ class Steal:
                        "path means turning on the benefits that path provides "
                        "(and turning off the benefits your previous path provided).\n\n"
                        "Right now, your active path is Advanced Security. Learn more "
-                       "about each path at ...")
+                       "about each path at https://github.com/keanemind/Keane-Cogs/wiki/Commands#steal")
             await self.bot.send_message(player, message)
             await asyncio.sleep(2)
 
