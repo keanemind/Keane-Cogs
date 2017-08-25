@@ -631,6 +631,8 @@ class Steal:
     async def give_credits(self):
         """Loop to give credits every hour at a random minute and second
         to Blackmarket Finances users."""
+        await self.bot.wait_until_ready()
+
         while True:
             now = datetime.datetime.utcnow()
             bank = self.bot.get_cog("Economy").bank
@@ -659,6 +661,8 @@ class Steal:
 
     async def daily_report(self):
         """Loop to report theft every day."""
+        await self.bot.wait_until_ready()
+
         now = datetime.datetime.now()
         wake_time = now.replace(hour=20, minute=0, second=0, microsecond=0)
         if now.hour > wake_time.hour:

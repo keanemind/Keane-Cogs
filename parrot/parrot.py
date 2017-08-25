@@ -505,6 +505,8 @@ class Parrot:
 
         Update HoursAlive, warn servers when Parrot is starving soon,
         perch on users at perchtime, and reset Parrot at checktime."""
+        await self.bot.wait_until_ready()
+
         self.update_looptimes()
         current_hour = datetime.datetime.utcnow().hour
         while True:
