@@ -1,0 +1,10 @@
+{
+    "AUTHOR" : "Keane Nguyen",
+    "INSTALL_MSG" : "Thanks for adding my cog to your bot. This cog needs the Economy cog to be loaded to function.",
+    "NAME" : "Steal",
+    "SHORT" : "Steal credits from fellow server members.",
+    "DESCRIPTION" : "Steal credits from fellow server members. Spend credits on upgrades to strike harder or protect yourself.",
+    "TAGS" : ["game", "steal"],
+    "REQUIREMENTS" : [],
+    "HIDDEN" : false
+}
