@@ -15,7 +15,10 @@ from .utils.dataIO import dataIO
 SAVE_FILEPATH = "data/KeaneCogs/steal/steal.json"
 
 SAVE_DEFAULT = {
-    "Servers": {}
+    "Servers": {},
+    "Global": {
+        "CreditsGivenTime": "1970-01-01T00:00:00.0",
+    },
 }
 
 SERVER_DEFAULT = {
@@ -608,16 +611,19 @@ class Steal:
         """Loop to give credits every hour at a random minute and second
         to Blackmarket Finances users."""
         while True:
-            bank = self.bot.get_cog("Economy").bank
             now = datetime.datetime.utcnow()
-            next_time = now.replace(hour=now.hour + 1,
-                                    minute=random.randint(0, 59),
-                                    second=random.randint(1, 59),
-                                    microsecond=0)
-            # If next_time is X:00:00 and the sleep below is slightly short,
-            # the hour will still be the previous hour and credits could be given
-            # twice in the same hour. To be safe, the minimum second is 1.
-            await asyncio.sleep((next_time - now).total_seconds())
+            bank = self.bot.get_cog("Economy").bank
+            last_given = datetime.datetime.strptime(self.save_file["Global"]["CreditsGivenTime"],
+                                                    "%Y-%m-%dT%H:%M:%S.%f")
+            if last_given.hour == now.hour and last_given.date() == now.date():
+                next_time = now.replace(hour=now.hour + 1,
+                                        minute=random.randint(0, 59),
+                                        second=random.randint(1, 59),
+                                        microsecond=0)
+                # If next_time is X:00:00 and the sleep below is slightly short,
+                # the hour will still be the previous hour and credits could be given
+                # twice in the same hour. To be safe, the minimum second is 1.
+                await asyncio.sleep((next_time - now).total_seconds())
 
             for serverid in self.save_file["Servers"]:
                 server = self.bot.get_server(serverid)
@@ -626,6 +632,9 @@ class Steal:
                     if playersave["Active"] == "BF" and playersave["BF"] > 0:
                         player = server.get_member(playerid)
                         bank.deposit_credits(player, playersave["BF"])
+
+            self.save_file["Global"]["CreditsGivenTime"] = datetime.datetime.utcnow().isoformat()
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     async def daily_report(self):
         """Loop to report theft every day."""
