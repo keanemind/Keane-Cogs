@@ -129,10 +129,10 @@ class Steal:
                 loop = False
             elif response.content == "1":
                 since_steal = round(time.time() - playersave["LatestSteal"])
-                if since_steal > 20 * 60:
+                if since_steal > 60 * 60:
                     loop = await self.steal_menu(ctx)
                 else:
-                    until_available = (20 * 60) - since_steal
+                    until_available = (60 * 60) - since_steal
                     m, s = divmod(until_available, 60)
                     h, m = divmod(m, 60)
                     message = "Steal is on cooldown. Time left: {:d}:{:02d}:{:02d}".format(h, m, s)
