@@ -75,16 +75,17 @@ class Steal:
 
         # Check if main_menu is already running for them
         if player.id in self.menu_users:
-            return await self.bot.say("The command is already running for you. "
-                                      "Check your direct messages.")
+            message = "The command is already running for you here."
+            return await self.bot.send_message(player, message)
 
-        await self.bot.say("Check your direct messages.")
         self.menu_users.append(player.id)
 
         # Add player, display newbie introduction
         if player.id not in servers[server.id]["Players"]:
+            await self.bot.say("Check your direct messages.")
             servers[server.id]["Players"][player.id] = copy.deepcopy(PLAYER_DEFAULT)
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
+
             message = ("Welcome to the world of crime!\n"
                        "There are three upgrade paths you can choose from. "
                        "You can upgrade in multiple paths at once, but only one "
@@ -92,7 +93,11 @@ class Steal:
                        "path means turning on the benefits that path provides "
                        "(and turning off the benefits your previous path provided).\n\n"
                        "Right now, your active path is Advanced Security. Learn more "
-                       "about each path at https://github.com/keanemind/Keane-Cogs/wiki/Commands#steal")
+                       "about each path at https://github.com/keanemind/Keane-Cogs/wiki/Commands#steal \n\n"
+                       "**NOTICE: immediately deleting your `!steal` message "
+                       "that invoked this command is recommended every time you "
+                       "use steal. This will prevent other members of the server from "
+                       "learning that you are using the command, possibly to steal from them.**")
             await self.bot.send_message(player, message)
             await asyncio.sleep(2)
 
