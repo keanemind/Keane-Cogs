@@ -82,7 +82,7 @@ class Steal:
 
         # Add player, display newbie introduction
         if player.id not in servers[server.id]["Players"]:
-            await self.bot.say("Check your direct messages.")
+            d_message = await self.bot.say("Check for a direct message from me.")
             servers[server.id]["Players"][player.id] = copy.deepcopy(PLAYER_DEFAULT)
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
@@ -99,7 +99,8 @@ class Steal:
                        "use steal. This will prevent other members of the server from "
                        "learning that you are using the command, possibly to steal from them.**")
             await self.bot.send_message(player, message)
-            await asyncio.sleep(2)
+            await asyncio.sleep(4)
+            await self.bot.delete_message(d_message)
 
         # Menu
         await self.main_menu(ctx)
