@@ -669,13 +669,13 @@ class Steal:
         """Loop to report theft every day."""
         await self.bot.wait_until_ready()
 
-        now = datetime.datetime.now()
-        wake_time = now.replace(hour=20, minute=0, second=0, microsecond=0)
+        now = datetime.datetime.utcnow()
+        wake_time = now.replace(hour=2, minute=0, second=0, microsecond=0)
         if now.time() > wake_time.time():
             wake_time = wake_time + datetime.timedelta(days=1)
 
         while True:
-            await asyncio.sleep((wake_time - datetime.datetime.now()).total_seconds())
+            await asyncio.sleep((wake_time - datetime.datetime.utcnow()).total_seconds())
             wake_time = wake_time + datetime.timedelta(days=1)
 
             for serverid in self.save_file["Servers"]:
