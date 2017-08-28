@@ -32,7 +32,8 @@ PLAYER_DEFAULT = {
     "ER": 0,
     "AS": 0,
     "BF": 0,
-    "LatestSteal": 0, # The time that the user last attempted to steal, assigned to dummy value
+    "StealTime": 0, # The time that the user last attempted to steal, assigned to dummy value
+    "ActivateTime": 0, # The time that the users last activated an upgrade, assigned to dummy value
 }
 
 PRIMARY_UPGRADES = {
@@ -128,7 +129,7 @@ class Steal:
             if response is None or response.content not in {"1", "2", "3"}:
                 loop = False
             elif response.content == "1":
-                since_steal = round(time.time() - playersave["LatestSteal"])
+                since_steal = round(time.time() - playersave["StealTime"])
                 if since_steal > 60 * 60:
                     loop = await self.steal_menu(ctx)
                 else:
@@ -140,7 +141,15 @@ class Steal:
             elif response.content == "2":
                 loop = await self.upgrade_menu(ctx)
             elif response.content == "3":
-                loop = await self.activate_menu(ctx)
+                since_activate = round(time.time() - playersave["ActivateTime"])
+                if since_activate > 60 * 60:
+                    loop = await self.activate_menu(ctx)
+                else:
+                    until_available = (60 * 60) - since_activate
+                    m, s = divmod(until_available, 60)
+                    h, m = divmod(m, 60)
+                    message = "Activate is on cooldown. Time left: {:d}:{:02d}:{:02d}".format(h, m, s)
+                    await self.bot.send_message(player, message)
 
             if loop:
                 await asyncio.sleep(2)
@@ -366,6 +375,7 @@ class Steal:
 
         paths = {str(num):pathkey for num, pathkey in options}
         playersave["Active"] = paths[response.content]
+        playersave["ActivateTime"] = time.time()
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
         await self.bot.send_message(player, "Activation complete.")
@@ -527,7 +537,7 @@ class Steal:
                 else:
                     await self.steal_failure(ctx)
 
-        playersave["LatestSteal"] = time.time()
+        playersave["StealTime"] = time.time()
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     async def er_steal(self, ctx, target):
