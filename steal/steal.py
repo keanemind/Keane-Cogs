@@ -18,6 +18,7 @@ SAVE_DEFAULT = {
     "Servers": {},
     "Global": {
         "CreditsGivenTime": "1970-01-01T00:00:00.0",
+        "Version": "1.1",
     },
 }
 
@@ -48,6 +49,8 @@ class Steal:
     def __init__(self, bot):
         self.save_file = dataIO.load_json(SAVE_FILEPATH)
         self.bot = bot
+
+        self.update_version()
 
         self.menu_users = [] # list is probably inefficient
 
@@ -701,6 +704,21 @@ class Steal:
                 serverdata["Thieves"].clear()
 
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
+
+    def update_version(self):
+        """Update the save file if necessary."""
+        if "Version" not in self.save_file["Global"]: # if Version 1.0
+            for serverid in self.save_file["Servers"]:
+                for playerid in self.save_file["Servers"][serverid]["Players"]:
+                    playersave = self.save_file["Servers"][serverid]["Players"][playerid]
+
+                    playersave["StealTime"] = playersave["LatestSteal"]
+                    del playersave["LatestSteal"]
+                    playersave["ActivateTime"] = 0
+
+            self.save_file["Global"]["Version"] = "1.1"
+
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     def __unload(self):
         self.loop_task.cancel()
