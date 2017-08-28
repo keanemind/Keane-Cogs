@@ -218,6 +218,8 @@ class Steal:
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
         await self.steal_credits(ctx, target)
+        self.save_file["Servers"][server.id]["Players"][player.id]["StealTime"] = time.time()
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
         return True
 
@@ -540,7 +542,6 @@ class Steal:
                 else:
                     await self.steal_failure(ctx)
 
-        playersave["StealTime"] = time.time()
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     async def er_steal(self, ctx, target):
