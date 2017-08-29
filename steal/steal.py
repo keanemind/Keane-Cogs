@@ -555,8 +555,8 @@ class Steal:
             # 1/10 chance to steal 110% of wealth, if steal successful in the first place
             if random.randint(1, 100) <= 10:
                 amt_stolen = round(bank.get_balance(target) * 1.1)
-                bank.deposit_credits(player, amt_stolen)
                 bank.set_credits(target, 0)
+                bank.deposit_credits(player, amt_stolen)
 
                 message = ("You captured a good friend of {0}'s as hostage "
                            "and demanded ransom, which was promptly paid. "
