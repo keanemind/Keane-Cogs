@@ -412,7 +412,7 @@ class Parrot:
 
         if parrot["ChecksAlive"] == 0:
         # add an extra day because the first check won't starve or change Parrot's appetite
-            until_starved = (self.checktime.replace(day=self.checktime.day + 1)
+            until_starved = (self.checktime + datetime.timedelta(days=1)
                              - datetime.datetime.utcnow())
         else:
             until_starved = self.checktime - datetime.datetime.utcnow()
@@ -694,7 +694,7 @@ class Parrot:
                                                        second=0,
                                                        microsecond=0)
         if datetime.datetime.utcnow().time() >= checktime.time():
-            checktime = checktime.replace(day=datetime.datetime.utcnow().day + 1)
+            checktime = checktime + datetime.timedelta(days=1)
 
         if self.checktime != checktime: # if StarveTime changed (this will always be true
                                         # when Parrot is first loaded due to self.checktime's
