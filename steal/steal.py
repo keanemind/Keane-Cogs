@@ -52,7 +52,7 @@ class Steal:
 
         self.update_version()
 
-        self.menu_users = [] # list is probably inefficient
+        self.menu_users = set()
 
         self.loop_task = bot.loop.create_task(self.give_credits())
         self.loop_task2 = bot.loop.create_task(self.daily_report())
@@ -82,7 +82,7 @@ class Steal:
             message = "The command is already running for you here."
             return await self.bot.send_message(player, message)
 
-        self.menu_users.append(player.id)
+        self.menu_users.add(player.id)
 
         # Add player, display newbie introduction
         if player.id not in servers[server.id]["Players"]:
