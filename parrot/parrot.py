@@ -39,7 +39,7 @@ SERVER_DEFAULT = {
 
         "StarvedLoops": 0, # phase of starvation Parrot is in
 
-        "WarnedYet": False, # whether the server has been warned for the current self.checktime or not
+        "WarnedYet": False, # whether the server has been warned for the current self.checktime
 
         "StealAvailable": True # whether steal is available for the perched user (reset by perch_loop)
     },
@@ -167,7 +167,7 @@ class Parrot:
 
         # confirmation prompt
         await self.bot.say("This is a global setting that affects all servers the bot is connected to. "
-                           "Parrot checks whether he has starved or not every day at a certain time. "
+                           "Parrot checks whether he has starved every day at a certain time. "
                            "Parrot will check every day (including today if possible) at {} UTC. "
                            "Reply \"yes\" to confirm."
                            .format(datetime.time(hour, minute).strftime("%H:%M")))
