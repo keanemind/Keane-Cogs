@@ -131,27 +131,26 @@ class Steal:
 
             if response is None or response.content not in {"1", "2", "3"}:
                 loop = False
+
             elif response.content == "1":
                 since_steal = round(time.time() - playersave["StealTime"])
                 if since_steal > 60 * 60:
                     loop = await self.steal_menu(ctx)
                 else:
-                    until_available = (60 * 60) - since_steal
-                    m, s = divmod(until_available, 60)
-                    h, m = divmod(m, 60)
-                    message = "Steal is on cooldown. Time left: {:d}:{:02d}:{:02d}".format(h, m, s)
+                    time_left = time_left_str(since_steal)
+                    message = "Steal is on cooldown. Time left: " + time_left
                     await self.bot.send_message(player, message)
+
             elif response.content == "2":
                 loop = await self.upgrade_menu(ctx)
+
             elif response.content == "3":
                 since_activate = round(time.time() - playersave["ActivateTime"])
                 if since_activate > 60 * 60:
                     loop = await self.activate_menu(ctx)
                 else:
-                    until_available = (60 * 60) - since_activate
-                    m, s = divmod(until_available, 60)
-                    h, m = divmod(m, 60)
-                    message = "Activate is on cooldown. Time left: {:d}:{:02d}:{:02d}".format(h, m, s)
+                    time_left = time_left_str(since_activate)
+                    message = "Activate is on cooldown. Time left: " + time_left
                     await self.bot.send_message(player, message)
 
             if loop:
@@ -724,6 +723,14 @@ class Steal:
     def __unload(self):
         self.loop_task.cancel()
         self.loop_task2.cancel()
+
+def time_left_str(since_time):
+    """Return a string with how much time is left until
+    the 1 hour cooldown is over."""
+    until_available = (60 * 60) - since_time
+    m, s = divmod(until_available, 60)
+    h, m = divmod(m, 60)
+    return "{:d}:{:02d}:{:02d}".format(h, m, s)
 
 def dir_check():
     """Create a folder and save file for the cog if they don't exist."""
