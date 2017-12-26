@@ -72,9 +72,7 @@ class Steal:
                 ("No", "main_menu")
             ]
         }
-        self.done = {
-            "prompt": "Goodbye!"
-        }
+        self.done = {}
 
         self.loop_task = bot.loop.create_task(self.give_credits())
         self.loop_task2 = bot.loop.create_task(self.daily_report())
@@ -134,21 +132,13 @@ class Steal:
 
         # Menu
         current_menu = self.menu_users[player.id]["main_menu"]
-        while True:
-            # Display prompt
-            d_message = await self.bot.send_message(player, current_menu["prompt"])
-
-            # Check exit condition
-            if current_menu is self.done:
-                break
-
-            # Split into the two types of menus
+        while current_menu is not self.done:
             if current_menu["choice_type"] == "multi":
-                # Display choices
-                message = ""
+                # Display prompt and choices
+                message = current_menu["prompt"]
                 for index, choice_tuple in enumerate(current_menu["choices"]):
-                    message += "{}. {}\n".format(index + 1, choice_tuple[0])
-                await self.bot.send_message(player, message)
+                    message += "\n{}. {}".format(index + 1, choice_tuple[0])
+                d_message = await self.bot.send_message(player, message)
 
                 # Receive user's choice
                 response = await self.bot.wait_for_message(timeout=60,
@@ -160,7 +150,7 @@ class Steal:
                     continue
 
                 try:
-                    user_choice = int(response)
+                    user_choice = int(response.content)
                 except ValueError:
                     await self.bot.send_message(player, "Please choose a number from the menu.")
                     continue
@@ -179,8 +169,11 @@ class Steal:
                     current_menu = self.menu_users[player.id][choice[1]]
 
             elif current_menu["choice_type"] == "free": # all free choice menus have a function to call
+                # Display prompt
+                d_message = await self.bot.send_message(player, current_menu["prompt"])
+
                 # Receive user's choice
-                response = await self.bot.wait_for_message(timeout=60,
+                response = await self.bot.wait_for_message(timeout=30,
                                                            author=player,
                                                            channel=d_message.channel)
 
@@ -192,6 +185,8 @@ class Steal:
                 next_menu = await current_menu["action"](ctx, response, *current_menu["args"])
                 current_menu = self.menu_users[player.id][next_menu]
 
+            await asyncio.sleep(1)
+
         del self.menu_users[player.id]
 
     async def attempt_upgrade(self, ctx, upgrade_name):
@@ -200,12 +195,12 @@ class Steal:
         server = ctx.message.server
         playersave = self.save_file["Servers"][server.id]["Players"][player.id]
 
-        if playersave[upgrade_name] <= 99:
+        if playersave[upgrade_name] >= 99:
             await self.bot.send_message(player, "That path is already max level.")
             return "upgrade_menu"
 
         self.menu_users[player.id]["num_levels_menu"] = {
-            "prompt": ("How many levels would you like to upgrade?"
+            "prompt": ("How many levels would you like to upgrade? "
                        "Must be between 1 and {} inclusive. Reply with a non-number "
                        "to cancel.".format(99 - playersave[upgrade_name])),
             "choice_type": "free",
@@ -224,7 +219,7 @@ class Steal:
 
         # Check the user's response
         try:
-            lvls = int(response)
+            lvls = int(response.content)
         except ValueError:
             await self.bot.send_message(player, "Upgrade cancelled.")
             return "upgrade_menu"
@@ -274,7 +269,7 @@ class Steal:
             num = math.log(num, 1.933) - current_lvl
             # num is the exact number of levels the user can afford to upgrade
 
-            lvls = num // 1 # round down
+            lvls = int(num) # round down
 
             if lvls == 0:
                 message = "You cannot afford to upgrade this path at all."
@@ -307,6 +302,7 @@ class Steal:
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
         await self.bot.send_message(player, "Activation complete.")
+        return "main_menu"
 
     async def attempt_steal(self, ctx, target):
         """Wrapper function with safety checks that steals and returns main_menu."""
@@ -386,7 +382,7 @@ class Steal:
 
         # Create menu
         self.menu_users[player.id]["upgrade_menu"] = {
-            "prompt": "What would you like to upgrade? *currently active",
+            "prompt": "What would you like to upgrade? \*currently active",
             "choice_type": "multi",
             "choices": []
         }
