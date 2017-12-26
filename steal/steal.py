@@ -187,6 +187,8 @@ class Steal:
 
             await asyncio.sleep(1)
 
+        await self.bot.send_message(player, "Goodbye!")
+
         del self.menu_users[player.id]
 
     async def attempt_upgrade(self, ctx, upgrade_name):
