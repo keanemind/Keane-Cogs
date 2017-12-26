@@ -18,7 +18,7 @@ SAVE_DEFAULT = {
     "Servers": {},
     "Global": {
         "CreditsGivenTime": "1970-01-01T00:00:00.0",
-        "Version": "1.1",
+        "Version": "1.2",
     },
 }
 
@@ -29,19 +29,19 @@ SERVER_DEFAULT = {
 }
 
 PLAYER_DEFAULT = {
-    "Active": "AS",
-    "ER": 0,
-    "AS": 0,
-    "BF": 0,
+    "Active": "Advanced Security",
+    "Elite Raid": 0,
+    "Advanced Security": 0,
+    "Blackmarket Finances": 0,
     "StealTime": 0, # The time that the user last attempted to steal, assigned to dummy value
     "ActivateTime": 0, # The time that the users last activated an upgrade, assigned to dummy value
 }
 
-PRIMARY_UPGRADES = {
-    "ER":"Elite Raid",
-    "AS":"Advanced Security",
-    "BF":"Blackmarket Finances",
-}
+PRIMARY_UPGRADES = [
+    "Elite Raid",
+    "Advanced Security",
+    "Blackmarket Finances",
+]
 
 class Steal:
     """Steal credits from other users and spend credits on upgrades."""
@@ -289,7 +289,7 @@ class Steal:
         else:
             cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
 
-        if playersave["BF"] == 99:
+        if playersave["Blackmarket Finances"] == 99:
             cost = round(cost / 2)
         else:
             cost = round(cost)
@@ -312,7 +312,7 @@ class Steal:
             lvls = 1
             cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
 
-            if playersave["BF"] == 99:
+            if playersave["Blackmarket Finances"] == 99:
                 cost = round(cost / 2)
             else:
                 cost = round(cost)
@@ -321,7 +321,7 @@ class Steal:
                 lvls += 1
                 cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
 
-                if playersave["BF"] == 99:
+                if playersave["Blackmarket Finances"] == 99:
                     cost = round(cost / 2)
                 else:
                     cost = round(cost)
@@ -333,7 +333,7 @@ class Steal:
                 lvls -= 1
                 cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
 
-                if playersave["BF"] == 99:
+                if playersave["Blackmarket Finances"] == 99:
                     cost = round(cost / 2)
                 else:
                     cost = round(cost)
@@ -412,7 +412,8 @@ class Steal:
 
         if response is None:
             await self.bot.send_message(player, "You failed!")
-            if targetsave["Active"] == "AS" and random.randint(1, 100) <= targetsave["AS"]:
+            if (targetsave["Active"] == "Advanced Security"
+                and random.randint(1, 100) <= targetsave["Advanced Security"]):
                 bank.deposit_credits(target, 1000)
             return
         else:
@@ -420,17 +421,17 @@ class Steal:
             await asyncio.sleep(1)
 
         # ATTACKER: ELITE RAID
-        if playersave["Active"] == "ER":
+        if playersave["Active"] == "Elite Raid":
             # Elite Raid v Elite Raid
-            if targetsave["Active"] == "ER":
+            if targetsave["Active"] == "Elite Raid":
                 if random.randint(1, 100) <= 66:
                     await self.er_steal(ctx, target)
                 else:
                     await self.steal_failure(ctx)
 
             # Elite Raid v Advanced Security
-            elif targetsave["Active"] == "AS":
-                if targetsave["AS"] == 99:
+            elif targetsave["Active"] == "Advanced Security":
+                if targetsave["Advanced Security"] == 99:
                     success_chance = 33 / 2
                 else:
                     success_chance = 33
@@ -440,44 +441,44 @@ class Steal:
                 else:
                     await self.steal_failure(ctx)
 
-                    if random.randint(1, 100) <= targetsave["AS"]:
+                    if random.randint(1, 100) <= targetsave["Advanced Security"]:
                         bank.deposit_credits(target, 1000)
 
                     # Elite Raid is immune to Advanced Security's cameras
 
-                if playersave["ER"] >= 66:
+                if playersave["Elite Raid"] >= 66:
                     if random.randint(1, 100) <= 33:
-                        if targetsave["AS"] > 5:
-                            targetsave["AS"] -= 5
+                        if targetsave["Advanced Security"] > 5:
+                            targetsave["Advanced Security"] -= 5
                         else:
-                            targetsave["AS"] = 0
+                            targetsave["Advanced Security"] = 0
 
             # Elite Raid v Blackmarket Finances
-            elif targetsave["Active"] == "BF":
+            elif targetsave["Active"] == "Blackmarket Finances":
                 if random.randint(1, 100) <= 66:
                     await self.er_steal(ctx, target)
                 else:
                     await self.steal_failure(ctx)
 
-                if targetsave["BF"] >= 66:
+                if targetsave["Blackmarket Finances"] >= 66:
                     if random.randint(1, 100) <= 33:
-                        if playersave["ER"] > 5:
-                            playersave["ER"] -= 5
+                        if playersave["Elite Raid"] > 5:
+                            playersave["Elite Raid"] -= 5
                         else:
-                            playersave["ER"] = 0
+                            playersave["Elite Raid"] = 0
 
         # ATTACKER: ADVANCED SECURITY
-        elif playersave["Active"] == "AS":
+        elif playersave["Active"] == "Advanced Security":
             # Advanced Security v Elite Raid
-            if targetsave["Active"] == "ER":
+            if targetsave["Active"] == "Elite Raid":
                 if random.randint(1, 100) <= 33:
                     await self.regular_steal(ctx, target)
                 else:
                     await self.steal_failure(ctx)
 
             # Advanced Security v Advanced Security
-            elif targetsave["Active"] == "AS":
-                if targetsave["AS"] == 99:
+            elif targetsave["Active"] == "Advanced Security":
+                if targetsave["Advanced Security"] == 99:
                     success_chance = 33 / 2
                 else:
                     success_chance = 33
@@ -487,31 +488,31 @@ class Steal:
                 else:
                     await self.steal_failure(ctx)
 
-                    if random.randint(1, 100) <= targetsave["AS"]:
+                    if random.randint(1, 100) <= targetsave["Advanced Security"]:
                         bank.deposit_credits(target, 1000)
 
-                    if targetsave["AS"] >= 33:
+                    if targetsave["Advanced Security"] >= 33:
                         await self.reveal_attacker(ctx, target)
 
             # Advanced Security v Blackmarket Finances
-            elif targetsave["Active"] == "BF":
+            elif targetsave["Active"] == "Blackmarket Finances":
                 if random.randint(1, 100) <= 33:
                     await self.regular_steal(ctx, target)
                 else:
                     await self.steal_failure(ctx)
 
         # ATTACKER: BLACKMARKET FINANCES
-        elif playersave["Active"] == "BF":
+        elif playersave["Active"] == "Blackmarket Finances":
             # Blackmarket Finances v Elite Raid
-            if targetsave["Active"] == "ER":
+            if targetsave["Active"] == "Elite Raid":
                 if random.randint(1, 100) <= 50:
                     await self.regular_steal(ctx, target)
                 else:
                     await self.steal_failure(ctx)
 
             # Blackmarket Finances v Advanced Security
-            elif targetsave["Active"] == "AS":
-                if targetsave["AS"] == 99:
+            elif targetsave["Active"] == "Advanced Security":
+                if targetsave["Advanced Security"] == 99:
                     success_chance = 33 / 2
                 else:
                     success_chance = 33
@@ -521,21 +522,21 @@ class Steal:
                 else:
                     await self.steal_failure(ctx)
 
-                    if random.randint(1, 100) <= targetsave["AS"]:
+                    if random.randint(1, 100) <= targetsave["Advanced Security"]:
                         bank.deposit_credits(target, 1000)
 
-                    if targetsave["AS"] >= 33:
+                    if targetsave["Advanced Security"] >= 33:
                         await self.reveal_attacker(ctx, target)
 
-                if targetsave["AS"] >= 66:
+                if targetsave["Advanced Security"] >= 66:
                     if random.randint(1, 100) <= 33:
-                        if playersave["BF"] > 5:
-                            playersave["BF"] -= 5
+                        if playersave["Blackmarket Finances"] > 5:
+                            playersave["Blackmarket Finances"] -= 5
                         else:
-                            playersave["BF"] = 0
+                            playersave["Blackmarket Finances"] = 0
 
             # Blackmarket Finances v Blackmarket Finances
-            elif targetsave["Active"] == "BF":
+            elif targetsave["Active"] == "Blackmarket Finances":
                 if random.randint(1, 100) <= 50:
                     await self.regular_steal(ctx, target)
                 else:
@@ -550,7 +551,7 @@ class Steal:
         playersave = self.save_file["Servers"][server.id]["Players"][player.id]
         bank = self.bot.get_cog("Economy").bank
 
-        if playersave["ER"] == 99:
+        if playersave["Elite Raid"] == 99:
             # 1/10 chance to steal 110% of wealth, if steal successful in the first place
             if random.randint(1, 100) <= 10:
                 amt_stolen = round(bank.get_balance(target) * 1.1)
@@ -569,10 +570,10 @@ class Steal:
 
         amt_stolen = random.randint(1, random.randint(1, 2000))
 
-        if random.randint(1, 100) <= playersave["ER"]:
+        if random.randint(1, 100) <= playersave["Elite Raid"]:
             amt_stolen *= 2
 
-        if playersave["ER"] >= 33:
+        if playersave["Elite Raid"] >= 33:
             # steal a bonus 10% of target's wealth
             amt_stolen += round(bank.get_balance(target) * 0.1)
 
@@ -625,7 +626,7 @@ class Steal:
             "{}, who had {} active, was spotted by your guard "
             "stealing credits from your bank safe! Your guard "
             "was unable to catch the fiend before they fled."
-            .format(player.mention, PRIMARY_UPGRADES[playersave["Active"]])
+            .format(player.mention, playersave["Active"])
         )
         await self.bot.send_message(target, message)
 
@@ -671,9 +672,10 @@ class Steal:
                 server = self.bot.get_server(serverid)
                 for playerid in self.save_file["Servers"][serverid]["Players"]:
                     playersave = self.save_file["Servers"][serverid]["Players"][playerid]
-                    if playersave["Active"] == "BF" and playersave["BF"] > 0:
+                    if (playersave["Active"] == "Blackmarket Finances"
+                        and playersave["Blackmarket Finances"] > 0):
                         player = server.get_member(playerid)
-                        bank.deposit_credits(player, playersave["BF"])
+                        bank.deposit_credits(player, playersave["Blackmarket Finances"])
 
             self.save_file["Global"]["CreditsGivenTime"] = datetime.datetime.utcnow().isoformat()
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
@@ -717,6 +719,24 @@ class Steal:
                     playersave["ActivateTime"] = 0
 
             self.save_file["Global"]["Version"] = "1.1"
+
+        if self.save_file["Global"]["Version"] == "1.1":
+            for serverid in self.save_file["Servers"]:
+                for playerid in self.save_file["Servers"][serverid]["Players"]:
+                    playersave = self.save_file["Servers"][serverid]["Players"][playerid]
+
+                    convert_dict = {
+                        "AS": "Advanced Security",
+                        "ER": "Elite Raid",
+                        "BF": "Blackmarket Finances"
+                    }
+                    playersave["Active"] = convert_dict[playersave["Active"]]
+
+                    for key, value in convert_dict.items():
+                        playersave[value] = playersave[key]
+                        del playersave[key]
+
+            self.save_file["Global"]["Version"] = "1.2"
 
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
