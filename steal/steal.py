@@ -188,6 +188,137 @@ class Steal:
 
         del self.menu_users[player.id]
 
+# Beginning of menu functions
+    async def generate_steal_menu(self, ctx):
+        """If off cooldown, create a steal menu dict and add it
+        to the user's menus. Return the new menu's key."""
+        player = ctx.message.author
+        server = ctx.message.server
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
+
+        # Check cooldown
+        since_steal = round(time.time() - playersave["StealTime"])
+        if since_steal < 60 * 60:
+            time_left = time_left_str(since_steal)
+            message = "Steal is on cooldown. Time left: " + time_left
+            await self.bot.send_message(player, message)
+            return "main_menu"
+
+        # Create menu
+        self.menu_users[player.id]["steal_menu"] = {
+            "prompt": ("Who do you want to steal from? The user must be on the "
+                       "server you used `!steal` in. Enter a nickname, username, "
+                       "or for best results, a full tag like Keane#8251."),
+            "choice_type": "free",
+            "action": self.get_target,
+            "args": []
+        }
+        return "steal_menu"
+
+    async def generate_upgrade_menu(self, ctx):
+        """Create an upgrade menu dict and add it to the user's menus.
+        Return the new menu's key."""
+        player = ctx.message.author
+        server = ctx.message.server
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
+
+        # Create menu
+        self.menu_users[player.id]["upgrade_menu"] = {
+            "prompt": "What would you like to upgrade? \*currently active",
+            "choice_type": "multi",
+            "choices": []
+        }
+
+        # Generate choices and add them to the list
+        choices = self.menu_users[player.id]["upgrade_menu"]["choices"]
+        for upgrade_name in PRIMARY_UPGRADES:
+            option_text = "{} (lvl {})".format(upgrade_name, playersave[upgrade_name])
+            if upgrade_name == playersave["Active"]:
+                option_text += "*"
+            choices.append((option_text, self.attempt_upgrade, [upgrade_name]))
+
+        choices.append(("Go back", "main_menu"))
+
+        return "upgrade_menu"
+
+    async def generate_activate_menu(self, ctx):
+        """If off cooldown, create an activate menu dict and add it
+        to the user's menus. Return the new menu's key."""
+        player = ctx.message.author
+        server = ctx.message.server
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
+
+        # Check cooldown
+        since_activate = round(time.time() - playersave["ActivateTime"])
+        if since_activate < 60 * 60:
+            time_left = time_left_str(since_activate)
+            message = "Activate is on cooldown. Time left: " + time_left
+            await self.bot.send_message(player, message)
+            return "main_menu"
+
+        # Create menu
+        self.menu_users[player.id]["activate_menu"] = {
+            "prompt": ("{} is active. What would you like to activate?"
+                       .format(playersave["Active"])),
+            "choice_type": "multi",
+            "choices": []
+        }
+
+        # Generate choices and add them to the list
+        choices = self.menu_users[player.id]["activate_menu"]["choices"]
+        for upgrade_name in PRIMARY_UPGRADES:
+            if upgrade_name != playersave["Active"]:
+                option_text = "{} (lvl {})".format(upgrade_name, playersave[upgrade_name])
+                choices.append((option_text, self.activate, [upgrade_name]))
+
+        choices.append(("Go back", "main_menu"))
+
+        return "activate_menu"
+
+    async def get_target(self, ctx, response):
+        """Convert the user's response to a target, then steal from the target."""
+        server = ctx.message.server
+        player = ctx.message.author
+        target = server.get_member_named(response.content)
+
+        if target is None:
+            return "target_not_found"
+
+        else:
+            if "#" not in response.content:
+                self.menu_users[player.id]["target_confirmation"] = {
+                    "prompt": "Is {} the correct target?".format(target.mention),
+                    "choice_type": "multi",
+                    "choices": [
+                        ("Yes", self.attempt_steal, [target]),
+                        ("No", "steal_menu")
+                    ]
+                }
+                return "target_confirmation"
+
+            return await self.attempt_steal(ctx, target)
+
+    async def attempt_steal(self, ctx, target):
+        """Wrapper function with safety checks that steals and returns main_menu."""
+        server = ctx.message.server
+        player = ctx.message.author
+        player_data = self.save_file["Servers"][server.id]["Players"]
+        bank = self.bot.get_cog("Economy").bank
+
+        if not bank.account_exists(target):
+            await self.bot.send_message(player, "That person doesn't have a bank account.")
+            return "main_menu"
+
+        if target.id not in player_data:
+            player_data[target.id] = copy.deepcopy(PLAYER_DEFAULT)
+            dataIO.save_json(SAVE_FILEPATH, self.save_file)
+
+        await self.steal_credits(ctx, target)
+        player_data[player.id]["StealTime"] = time.time()
+        dataIO.save_json(SAVE_FILEPATH, self.save_file)
+
+        return "main_menu"
+
     async def attempt_upgrade(self, ctx, upgrade_name):
         """Check if the path is already max level. Returns a menu key."""
         player = ctx.message.author
@@ -302,136 +433,7 @@ class Steal:
 
         await self.bot.send_message(player, "Activation complete.")
         return "main_menu"
-
-    async def attempt_steal(self, ctx, target):
-        """Wrapper function with safety checks that steals and returns main_menu."""
-        server = ctx.message.server
-        player = ctx.message.author
-        player_data = self.save_file["Servers"][server.id]["Players"]
-        bank = self.bot.get_cog("Economy").bank
-
-        if not bank.account_exists(target):
-            await self.bot.send_message(player, "That person doesn't have a bank account.")
-            return "main_menu"
-
-        if target.id not in player_data:
-            player_data[target.id] = copy.deepcopy(PLAYER_DEFAULT)
-            dataIO.save_json(SAVE_FILEPATH, self.save_file)
-
-        await self.steal_credits(ctx, target)
-        player_data[player.id]["StealTime"] = time.time()
-        dataIO.save_json(SAVE_FILEPATH, self.save_file)
-
-        return "main_menu"
-
-    async def get_target(self, ctx, response):
-        """Convert the user's response to a target, then steal from the target."""
-        server = ctx.message.server
-        player = ctx.message.author
-        target = server.get_member_named(response.content)
-
-        if target is None:
-            return "target_not_found"
-
-        else:
-            if "#" not in response.content:
-                self.menu_users[player.id]["target_confirmation"] = {
-                    "prompt": "Is {} the correct target?".format(target.mention),
-                    "choice_type": "multi",
-                    "choices": [
-                        ("Yes", self.attempt_steal, [target]),
-                        ("No", "steal_menu")
-                    ]
-                }
-                return "target_confirmation"
-
-            return await self.attempt_steal(ctx, target)
-
-    async def generate_steal_menu(self, ctx):
-        """If off cooldown, create a steal menu dict and add it
-        to the user's menus. Return the new menu's key."""
-        player = ctx.message.author
-        server = ctx.message.server
-        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
-
-        # Check cooldown
-        since_steal = round(time.time() - playersave["StealTime"])
-        if since_steal < 60 * 60:
-            time_left = time_left_str(since_steal)
-            message = "Steal is on cooldown. Time left: " + time_left
-            await self.bot.send_message(player, message)
-            return "main_menu"
-
-        # Create menu
-        self.menu_users[player.id]["steal_menu"] = {
-            "prompt": ("Who do you want to steal from? The user must be on the "
-                       "server you used `!steal` in. Enter a nickname, username, "
-                       "or for best results, a full tag like Keane#8251."),
-            "choice_type": "free",
-            "action": self.get_target,
-            "args": []
-        }
-        return "steal_menu"
-
-    async def generate_upgrade_menu(self, ctx):
-        """Create an upgrade menu dict and add it to the user's menus.
-        Return the new menu's key."""
-        player = ctx.message.author
-        server = ctx.message.server
-        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
-
-        # Create menu
-        self.menu_users[player.id]["upgrade_menu"] = {
-            "prompt": "What would you like to upgrade? \*currently active",
-            "choice_type": "multi",
-            "choices": []
-        }
-
-        # Generate choices and add them to the list
-        choices = self.menu_users[player.id]["upgrade_menu"]["choices"]
-        for upgrade_name in PRIMARY_UPGRADES:
-            option_text = "{} (lvl {})".format(upgrade_name, playersave[upgrade_name])
-            if upgrade_name == playersave["Active"]:
-                option_text += "*"
-            choices.append((option_text, self.attempt_upgrade, [upgrade_name]))
-
-        choices.append(("Go back", "main_menu"))
-
-        return "upgrade_menu"
-
-    async def generate_activate_menu(self, ctx):
-        """If off cooldown, create an activate menu dict and add it
-        to the user's menus. Return the new menu's key."""
-        player = ctx.message.author
-        server = ctx.message.server
-        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
-
-        # Check cooldown
-        since_activate = round(time.time() - playersave["ActivateTime"])
-        if since_activate < 60 * 60:
-            time_left = time_left_str(since_activate)
-            message = "Activate is on cooldown. Time left: " + time_left
-            await self.bot.send_message(player, message)
-            return "main_menu"
-
-        # Create menu
-        self.menu_users[player.id]["activate_menu"] = {
-            "prompt": ("{} is active. What would you like to activate?"
-                       .format(playersave["Active"])),
-            "choice_type": "multi",
-            "choices": []
-        }
-
-        # Generate choices and add them to the list
-        choices = self.menu_users[player.id]["activate_menu"]["choices"]
-        for upgrade_name in PRIMARY_UPGRADES:
-            if upgrade_name != playersave["Active"]:
-                option_text = "{} (lvl {})".format(upgrade_name, playersave[upgrade_name])
-                choices.append((option_text, self.activate, [upgrade_name]))
-
-        choices.append(("Go back", "main_menu"))
-
-        return "activate_menu"
+# End of menu functions
 
     async def steal_credits(self, ctx, target):
         """Steal credits. Contains all the matchup logic."""
