@@ -54,25 +54,7 @@ class Steal:
         self.update_version()
 
         self.menu_users = {}
-        self.main_menu = {
-            "prompt": "What would you like to do?",
-            "choice_type": "multi",
-            "choices": [
-                ("Steal from someone", self.generate_steal_menu, []),
-                ("Buy an upgrade", self.generate_upgrade_menu, []),
-                ("Activate an upgrade path", self.generate_activate_menu, []),
-                ("Quit", "done")
-            ]
-        }
-        self.target_not_found = {
-            "prompt": "Target not found. Try again?",
-            "choice_type": "multi",
-            "choices": [
-                ("Yes", "steal_menu"),
-                ("No", "main_menu")
-            ]
-        }
-        self.done = {}
+        self.unloading = False
 
         self.loop_task = bot.loop.create_task(self.give_credits())
         self.loop_task2 = bot.loop.create_task(self.daily_report())
@@ -102,10 +84,27 @@ class Steal:
             message = "The command is already running for you here."
             return await self.bot.send_message(player, message)
 
+        # Add user to menu_users
         self.menu_users[player.id] = {
-            "main_menu": self.main_menu,
-            "target_not_found": self.target_not_found,
-            "done": self.done,
+            "main_menu": {
+                "prompt": "What would you like to do?",
+                "choice_type": "multi",
+                "choices": [
+                    ("Steal from someone", self.generate_steal_menu, []),
+                    ("Buy an upgrade", self.generate_upgrade_menu, []),
+                    ("Activate an upgrade path", self.generate_activate_menu, []),
+                    ("Quit", "done")
+                ]
+            },
+            "target_not_found": {
+                "prompt": "Target not found. Try again?",
+                "choice_type": "multi",
+                "choices": [
+                    ("Yes", "steal_menu"),
+                    ("No", "main_menu")
+                ]
+            },
+            "done": {}
         }
 
         # Add player, display newbie introduction
@@ -132,7 +131,7 @@ class Steal:
 
         # Menu
         current_menu = self.menu_users[player.id]["main_menu"]
-        while current_menu is not self.done:
+        while current_menu and not self.unloading:
             if current_menu["choice_type"] == "multi":
                 # Display prompt and choices
                 message = current_menu["prompt"]
@@ -184,8 +183,6 @@ class Steal:
                 # Call function and move to next state based on the function's return
                 next_menu = await current_menu["action"](ctx, response, *current_menu["args"])
                 current_menu = self.menu_users[player.id][next_menu]
-
-            await asyncio.sleep(1)
 
         await self.bot.send_message(player, "Goodbye!")
 
@@ -310,18 +307,19 @@ class Steal:
         """Wrapper function with safety checks that steals and returns main_menu."""
         server = ctx.message.server
         player = ctx.message.author
+        player_data = self.save_file["Servers"][server.id]["Players"]
         bank = self.bot.get_cog("Economy").bank
 
         if not bank.account_exists(target):
             await self.bot.send_message(player, "That person doesn't have a bank account.")
             return "main_menu"
 
-        if target.id not in self.save_file["Servers"][server.id]["Players"]:
-            self.save_file["Servers"][server.id]["Players"][target.id] = copy.deepcopy(PLAYER_DEFAULT)
+        if target.id not in player_data:
+            player_data[target.id] = copy.deepcopy(PLAYER_DEFAULT)
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
         await self.steal_credits(ctx, target)
-        self.save_file["Servers"][server.id]["Players"][player.id]["StealTime"] = time.time()
+        player_data[player.id]["StealTime"] = time.time()
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
         return "main_menu"
@@ -791,6 +789,7 @@ class Steal:
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     def __unload(self):
+        self.unloading = True
         self.loop_task.cancel()
         self.loop_task2.cancel()
 
