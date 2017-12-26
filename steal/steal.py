@@ -5,6 +5,7 @@ import copy
 import random
 import time
 import datetime
+import math
 
 import discord
 from discord.ext import commands
@@ -18,7 +19,7 @@ SAVE_DEFAULT = {
     "Servers": {},
     "Global": {
         "CreditsGivenTime": "1970-01-01T00:00:00.0",
-        "Version": "1.1",
+        "Version": "1.2",
     },
 }
 
@@ -29,19 +30,19 @@ SERVER_DEFAULT = {
 }
 
 PLAYER_DEFAULT = {
-    "Active": "AS",
-    "ER": 0,
-    "AS": 0,
-    "BF": 0,
+    "Active": "Advanced Security",
+    "Elite Raid": 0,
+    "Advanced Security": 0,
+    "Blackmarket Finances": 0,
     "StealTime": 0, # The time that the user last attempted to steal, assigned to dummy value
     "ActivateTime": 0, # The time that the users last activated an upgrade, assigned to dummy value
 }
 
-PRIMARY_UPGRADES = {
-    "ER":"Elite Raid",
-    "AS":"Advanced Security",
-    "BF":"Blackmarket Finances",
-}
+PRIMARY_UPGRADES = [
+    "Elite Raid",
+    "Advanced Security",
+    "Blackmarket Finances",
+]
 
 class Steal:
     """Steal credits from other users and spend credits on upgrades."""
@@ -52,7 +53,8 @@ class Steal:
 
         self.update_version()
 
-        self.menu_users = set()
+        self.menu_users = {}
+        self.unloading = False
 
         self.loop_task = bot.loop.create_task(self.give_credits())
         self.loop_task2 = bot.loop.create_task(self.daily_report())
@@ -82,7 +84,28 @@ class Steal:
             message = "The command is already running for you here."
             return await self.bot.send_message(player, message)
 
-        self.menu_users.add(player.id)
+        # Add user to menu_users
+        self.menu_users[player.id] = {
+            "main_menu": {
+                "prompt": "What would you like to do?",
+                "choice_type": "multi",
+                "choices": [
+                    ("Steal from someone", self.generate_steal_menu, []),
+                    ("Buy an upgrade", self.generate_upgrade_menu, []),
+                    ("Activate an upgrade path", self.generate_activate_menu, []),
+                    ("Quit", "done")
+                ]
+            },
+            "target_not_found": {
+                "prompt": "Target not found. Try again?",
+                "choice_type": "multi",
+                "choices": [
+                    ("Yes", "steal_menu"),
+                    ("No", "main_menu")
+                ]
+            },
+            "done": {}
+        }
 
         # Add player, display newbie introduction
         if player.id not in servers[server.id]["Players"]:
@@ -107,284 +130,310 @@ class Steal:
             await self.bot.delete_message(d_message)
 
         # Menu
-        await self.main_menu(ctx)
-        self.menu_users.remove(player.id)
+        current_menu = self.menu_users[player.id]["main_menu"]
+        while current_menu and not self.unloading:
+            if current_menu["choice_type"] == "multi":
+                # Display prompt and choices
+                message = current_menu["prompt"]
+                for index, choice_tuple in enumerate(current_menu["choices"]):
+                    message += "\n{}. {}".format(index + 1, choice_tuple[0])
+                d_message = await self.bot.send_message(player, message)
 
-    async def main_menu(self, ctx):
-        """Display the main menu."""
-        player = ctx.message.author
-        server = ctx.message.server
-        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
+                # Receive user's choice
+                response = await self.bot.wait_for_message(timeout=60,
+                                                           author=player,
+                                                           channel=d_message.channel)
 
-        loop = True
-        while True:
-            message = ("What would you like to do?\n"
-                       "1. Steal from someone\n"
-                       "2. Buy an upgrade\n"
-                       "3. Activate an upgrade path\n"
-                       "Reply with the number of your choice, or with anything else to cancel.")
-            d_message = await self.bot.send_message(player, message)
+                if response is None:
+                    current_menu = self.menu_users[player.id]["done"]
+                    continue
 
-            response = await self.bot.wait_for_message(timeout=60,
-                                                       author=player,
-                                                       channel=d_message.channel)
+                try:
+                    user_choice = int(response.content)
+                except ValueError:
+                    await self.bot.send_message(player, "Please choose a number from the menu.")
+                    continue
 
-            if response is None or response.content not in {"1", "2", "3"}:
-                loop = False
-            elif response.content == "1":
-                since_steal = round(time.time() - playersave["StealTime"])
-                if since_steal > 60 * 60:
-                    loop = await self.steal_menu(ctx)
+                if user_choice < 1 or user_choice > len(current_menu["choices"]):
+                    await self.bot.send_message(player, "Please choose a number from the menu.")
+                    continue
+
+                # Move to next state based on their choice
+                choice = current_menu["choices"][user_choice - 1]
+
+                if len(choice) == 3: # a function needs to be called
+                    next_menu = await choice[1](ctx, *choice[2])
+                    current_menu = self.menu_users[player.id][next_menu]
                 else:
-                    until_available = (60 * 60) - since_steal
-                    m, s = divmod(until_available, 60)
-                    h, m = divmod(m, 60)
-                    message = "Steal is on cooldown. Time left: {:d}:{:02d}:{:02d}".format(h, m, s)
-                    await self.bot.send_message(player, message)
-            elif response.content == "2":
-                loop = await self.upgrade_menu(ctx)
-            elif response.content == "3":
-                since_activate = round(time.time() - playersave["ActivateTime"])
-                if since_activate > 60 * 60:
-                    loop = await self.activate_menu(ctx)
-                else:
-                    until_available = (60 * 60) - since_activate
-                    m, s = divmod(until_available, 60)
-                    h, m = divmod(m, 60)
-                    message = "Activate is on cooldown. Time left: {:d}:{:02d}:{:02d}".format(h, m, s)
-                    await self.bot.send_message(player, message)
+                    current_menu = self.menu_users[player.id][choice[1]]
 
-            if loop:
-                await asyncio.sleep(2)
-            else:
-                break
+            elif current_menu["choice_type"] == "free": # all free choice menus have a function to call
+                # Display prompt
+                d_message = await self.bot.send_message(player, current_menu["prompt"])
+
+                # Receive user's choice
+                response = await self.bot.wait_for_message(timeout=30,
+                                                           author=player,
+                                                           channel=d_message.channel)
+
+                if response is None:
+                    current_menu = self.menu_users[player.id]["done"]
+                    continue
+
+                # Call function and move to next state based on the function's return
+                next_menu = await current_menu["action"](ctx, response, *current_menu["args"])
+                current_menu = self.menu_users[player.id][next_menu]
 
         await self.bot.send_message(player, "Goodbye!")
 
-    async def steal_menu(self, ctx):
-        """Steal from someone."""
+        del self.menu_users[player.id]
+
+# Beginning of menu functions
+    async def generate_steal_menu(self, ctx):
+        """If off cooldown, create a steal menu dict and add it
+        to the user's menus. Return the new menu's key."""
         player = ctx.message.author
         server = ctx.message.server
-        bank = self.bot.get_cog("Economy").bank
-        while True:
-            message = ("Who do you want to steal from? The user must be on the "
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
+
+        # Check cooldown
+        since_steal = round(time.time() - playersave["StealTime"])
+        if since_steal < 60 * 60:
+            time_left = time_left_str(since_steal)
+            message = "Steal is on cooldown. Time left: " + time_left
+            await self.bot.send_message(player, message)
+            return "main_menu"
+
+        # Create menu
+        self.menu_users[player.id]["steal_menu"] = {
+            "prompt": ("Who do you want to steal from? The user must be on the "
                        "server you used `!steal` in. Enter a nickname, username, "
-                       "or for best results, a full tag like Keane#8251.")
-            d_message = await self.bot.send_message(player, message)
+                       "or for best results, a full tag like Keane#8251."),
+            "choice_type": "free",
+            "action": self.get_target,
+            "args": []
+        }
+        return "steal_menu"
 
-            response = await self.bot.wait_for_message(timeout=60,
-                                                       author=player,
-                                                       channel=d_message.channel)
-            if response is None:
-                return False
+    async def generate_upgrade_menu(self, ctx):
+        """Create an upgrade menu dict and add it to the user's menus.
+        Return the new menu's key."""
+        player = ctx.message.author
+        server = ctx.message.server
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
 
-            target = server.get_member_named(response.content)
+        # Create menu
+        self.menu_users[player.id]["upgrade_menu"] = {
+            "prompt": "What would you like to upgrade? \*currently active",
+            "choice_type": "multi",
+            "choices": []
+        }
 
-            if target is None:
-                message = ("Target not found. Try again?\n"
-                           "1. Yes\n")
-                await self.bot.send_message(player, message)
+        # Generate choices and add them to the list
+        choices = self.menu_users[player.id]["upgrade_menu"]["choices"]
+        for upgrade_name in PRIMARY_UPGRADES:
+            option_text = "{} (lvl {})".format(upgrade_name, playersave[upgrade_name])
+            if upgrade_name == playersave["Active"]:
+                option_text += "*"
+            choices.append((option_text, self.attempt_upgrade, [upgrade_name]))
 
-                response = await self.bot.wait_for_message(timeout=20,
-                                                           author=player,
-                                                           channel=d_message.channel)
-                if response is None:
-                    return False
-                elif response.content != "1":
-                    await self.bot.send_message(player, "Steal cancelled.")
-                    return True
+        choices.append(("Go back", "main_menu"))
 
-            elif "#" not in response.content:
-                message = ("Is {} the correct target?\n"
-                           "1. Yes\n".format(target.mention))
-                await self.bot.send_message(player, message)
+        return "upgrade_menu"
 
-                response = await self.bot.wait_for_message(timeout=20,
-                                                           author=player,
-                                                           channel=d_message.channel)
-                if response is None:
-                    return False
-                elif response.content == "1":
-                    break
-            else:
-                break
+    async def generate_activate_menu(self, ctx):
+        """If off cooldown, create an activate menu dict and add it
+        to the user's menus. Return the new menu's key."""
+        player = ctx.message.author
+        server = ctx.message.server
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
+
+        # Check cooldown
+        since_activate = round(time.time() - playersave["ActivateTime"])
+        if since_activate < 60 * 60:
+            time_left = time_left_str(since_activate)
+            message = "Activate is on cooldown. Time left: " + time_left
+            await self.bot.send_message(player, message)
+            return "main_menu"
+
+        # Create menu
+        self.menu_users[player.id]["activate_menu"] = {
+            "prompt": ("{} is active. What would you like to activate?"
+                       .format(playersave["Active"])),
+            "choice_type": "multi",
+            "choices": []
+        }
+
+        # Generate choices and add them to the list
+        choices = self.menu_users[player.id]["activate_menu"]["choices"]
+        for upgrade_name in PRIMARY_UPGRADES:
+            if upgrade_name != playersave["Active"]:
+                option_text = "{} (lvl {})".format(upgrade_name, playersave[upgrade_name])
+                choices.append((option_text, self.activate, [upgrade_name]))
+
+        choices.append(("Go back", "main_menu"))
+
+        return "activate_menu"
+
+    async def get_target(self, ctx, response):
+        """Convert the user's response to a target, then steal from the target."""
+        server = ctx.message.server
+        player = ctx.message.author
+        target = server.get_member_named(response.content)
+
+        if target is None:
+            return "target_not_found"
+
+        else:
+            if "#" not in response.content:
+                self.menu_users[player.id]["target_confirmation"] = {
+                    "prompt": "Is {} the correct target?".format(target.mention),
+                    "choice_type": "multi",
+                    "choices": [
+                        ("Yes", self.attempt_steal, [target]),
+                        ("No", "steal_menu")
+                    ]
+                }
+                return "target_confirmation"
+
+            return await self.attempt_steal(ctx, target)
+
+    async def attempt_steal(self, ctx, target):
+        """Wrapper function with safety checks that steals and returns main_menu."""
+        server = ctx.message.server
+        player = ctx.message.author
+        player_data = self.save_file["Servers"][server.id]["Players"]
+        bank = self.bot.get_cog("Economy").bank
 
         if not bank.account_exists(target):
             await self.bot.send_message(player, "That person doesn't have a bank account.")
-            return True
+            return "main_menu"
 
-        if target.id not in self.save_file["Servers"][server.id]["Players"]:
-            self.save_file["Servers"][server.id]["Players"][target.id] = copy.deepcopy(PLAYER_DEFAULT)
+        if target.id not in player_data:
+            player_data[target.id] = copy.deepcopy(PLAYER_DEFAULT)
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
         await self.steal_credits(ctx, target)
-        self.save_file["Servers"][server.id]["Players"][player.id]["StealTime"] = time.time()
+        player_data[player.id]["StealTime"] = time.time()
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
-        return True
+        return "main_menu"
 
-    async def upgrade_menu(self, ctx):
-        """Buy an upgrade."""
+    async def attempt_upgrade(self, ctx, upgrade_name):
+        """Check if the path is already max level. Returns a menu key."""
         player = ctx.message.author
         server = ctx.message.server
-        bank = self.bot.get_cog("Economy").bank
-
         playersave = self.save_file["Servers"][server.id]["Players"][player.id]
 
-        message = ("What would you like to upgrade? Reply with the number "
-                   "of your choice, or with anything else to cancel.\n")
-
-        zipped = zip(range(1, len(PRIMARY_UPGRADES) + 1), PRIMARY_UPGRADES)
-        options = [(num, key) for num, key in zipped]
-
-        for num, path in options:
-            message += "{}. {} (lvl {})".format(num,
-                                                PRIMARY_UPGRADES[path],
-                                                playersave[path])
-            if path == playersave["Active"]:
-                message += " *"
-
-            message += "\n"
-
-        message += "* currently active"
-        d_message = await self.bot.send_message(player, message)
-
-        response = await self.bot.wait_for_message(timeout=60,
-                                                   author=player,
-                                                   channel=d_message.channel)
-        if response is None:
-            return False
-        elif response.content not in {str(num) for num in range(1, len(PRIMARY_UPGRADES) + 1)}:
-            await self.bot.send_message(player, "Upgrade cancelled.")
-            return True
-
-        paths = {str(num):path for num, path in options}
-        path = paths[response.content]
-
-        if playersave[path] == 99:
+        if playersave[upgrade_name] >= 99:
             await self.bot.send_message(player, "That path is already max level.")
-            return True
+            return "upgrade_menu"
 
-        message = ("How many levels would you like to upgrade? Respond "
-                   "with a non-number to cancel.")
-        await self.bot.send_message(player, message)
+        self.menu_users[player.id]["num_levels_menu"] = {
+            "prompt": ("How many levels would you like to upgrade? "
+                       "Must be between 1 and {} inclusive. Reply with a non-number "
+                       "to cancel.".format(99 - playersave[upgrade_name])),
+            "choice_type": "free",
+            "action": self.attempt_upgrade2,
+            "args": [upgrade_name]
+        }
 
-        response = await self.bot.wait_for_message(timeout=20,
-                                                   author=player,
-                                                   channel=d_message.channel)
-        if response is None:
-            return False
+        return "num_levels_menu"
+
+    async def attempt_upgrade2(self, ctx, response, upgrade_name):
+        """Check if the response is a valid number of levels to upgrade.
+        Returns a menu key."""
+        player = ctx.message.author
+        server = ctx.message.server
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
+
+        # Check the user's response
         try:
             lvls = int(response.content)
         except ValueError:
             await self.bot.send_message(player, "Upgrade cancelled.")
-            return True
+            return "upgrade_menu"
 
-        current_lvl = playersave[path]
+        if lvls < 1 or lvls > 99 - playersave[upgrade_name]:
+            await self.bot.send_message(player, "Please choose a number within the range.")
+            return "num_levels_menu"
 
-        if current_lvl + lvls > 99:
-            lvls = 99 - current_lvl
-            cost = (5 * 99**1.933) - (5 * current_lvl**1.933)
-            await self.bot.send_message(player, "You cannot upgrade past lvl 99. You will only "
-                                        "upgrade {} levels.".format(99 - current_lvl))
-        else:
-            cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
+        # Check if the user can afford the upgrade
+        current_lvl = playersave[upgrade_name]
+        cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
 
-        if playersave["BF"] == 99:
+        if playersave["Blackmarket Finances"] == 99:
             cost = round(cost / 2)
         else:
             cost = round(cost)
 
-        await self.bot.send_message(player, "This will cost {} credits. If you cannot afford the cost, "
-                                    "the maximum number of levels you can afford will be upgraded. "
-                                    "Reply with \"yes\" to confirm, or anything else to cancel.".format(cost))
+        self.menu_users[player.id]["upgrade_confirm_menu"] = {
+            "prompt": "This will cost {} credits. If you cannot afford the cost, "
+                      "the maximum number of levels you can afford will be upgraded."
+                      .format(cost),
+            "choice_type": "multi",
+            "choices": [
+                ("Continue", self.attempt_upgrade3, [upgrade_name, lvls, cost]),
+                ("Cancel", "upgrade_menu")
+            ]
+        }
 
-        response = await self.bot.wait_for_message(timeout=20,
-                                                   author=player,
-                                                   channel=d_message.channel)
-        if response is None:
-            return False
-        elif response.content.lower() != "yes":
-            await self.bot.send_message(player, "Upgrade cancelled.")
-            return True
+        return "upgrade_confirm_menu"
+
+    async def attempt_upgrade3(self, ctx, upgrade_name, lvls, cost):
+        """Try to upgrade the number of levels passed."""
+        player = ctx.message.author
+        server = ctx.message.server
+        playersave = self.save_file["Servers"][server.id]["Players"][player.id]
+        bank = self.bot.get_cog("Economy").bank
 
         if not bank.can_spend(player, cost):
             balance = bank.get_balance(player)
-            lvls = 1
-            cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
+            current_lvl = playersave[upgrade_name]
 
-            if playersave["BF"] == 99:
+            # Find how many levels the user can afford to upgrade
+            num = balance / 5
+            if playersave["Blackmarket Finances"] == 99:
+                num *= 2
+            num += current_lvl**1.933
+            num = math.log(num, 1.933) - current_lvl
+            # num is the exact number of levels the user can afford to upgrade
+
+            lvls = int(num) # round down
+
+            if lvls == 0:
+                message = "You cannot afford to upgrade this path at all."
+                await self.bot.send_message(player, message)
+                return "upgrade_menu"
+
+            # Calculate reduced cost
+            cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
+            if playersave["Blackmarket Finances"] == 99:
                 cost = round(cost / 2)
             else:
                 cost = round(cost)
 
-            while cost < balance:
-                lvls += 1
-                cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
-
-                if playersave["BF"] == 99:
-                    cost = round(cost / 2)
-                else:
-                    cost = round(cost)
-
-            if lvls == 1:
-                await self.bot.send_message(player, "You cannot afford to upgrade this path at all.")
-                return True
-            else:
-                lvls -= 1
-                cost = (5 * (current_lvl + lvls)**1.933) - (5 * current_lvl**1.933)
-
-                if playersave["BF"] == 99:
-                    cost = round(cost / 2)
-                else:
-                    cost = round(cost)
-
         bank.withdraw_credits(player, cost)
-        playersave[path] += lvls
+        playersave[upgrade_name] += lvls
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
         await self.bot.send_message(player, "Upgrade complete.")
 
-        return True
+        return "main_menu"
 
-    async def activate_menu(self, ctx):
+    async def activate(self, ctx, upgrade_name):
         """Activate an upgrade path."""
         player = ctx.message.author
         server = ctx.message.server
         playersave = self.save_file["Servers"][server.id]["Players"][player.id]
 
-        message = ("{} is currently active. Which path do you want to activate?\n"
-                   .format(PRIMARY_UPGRADES[playersave["Active"]]))
-
-        inactives = {key:PRIMARY_UPGRADES[key]
-                     for key in PRIMARY_UPGRADES
-                     if key != playersave["Active"]}
-        zipped = zip(range(1, len(inactives) + 1), inactives)
-        options = [(num, key) for num, key in zipped]
-
-        for num, pathkey in options:
-            message += "{}. {} (lvl {})\n".format(num,
-                                                  inactives[pathkey],
-                                                  playersave[pathkey])
-
-        d_message = await self.bot.send_message(player, message)
-
-        response = await self.bot.wait_for_message(timeout=60,
-                                                   author=player,
-                                                   channel=d_message.channel)
-        if response is None:
-            return False
-        elif response.content not in {str(num) for num in range(1, len(inactives) + 1)}:
-            await self.bot.send_message(player, "Activation cancelled.")
-            return True
-
-        paths = {str(num):pathkey for num, pathkey in options}
-        playersave["Active"] = paths[response.content]
+        playersave["Active"] = upgrade_name
         playersave["ActivateTime"] = time.time()
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
         await self.bot.send_message(player, "Activation complete.")
-        return True
+        return "main_menu"
+# End of menu functions
 
     async def steal_credits(self, ctx, target):
         """Steal credits. Contains all the matchup logic."""
@@ -413,7 +462,8 @@ class Steal:
 
         if response is None:
             await self.bot.send_message(player, "You failed!")
-            if targetsave["Active"] == "AS" and random.randint(1, 100) <= targetsave["AS"]:
+            if (targetsave["Active"] == "Advanced Security"
+                    and random.randint(1, 100) <= targetsave["Advanced Security"]):
                 bank.deposit_credits(target, 1000)
             return
         else:
@@ -421,17 +471,17 @@ class Steal:
             await asyncio.sleep(1)
 
         # ATTACKER: ELITE RAID
-        if playersave["Active"] == "ER":
+        if playersave["Active"] == "Elite Raid":
             # Elite Raid v Elite Raid
-            if targetsave["Active"] == "ER":
+            if targetsave["Active"] == "Elite Raid":
                 if random.randint(1, 100) <= 66:
                     await self.er_steal(ctx, target)
                 else:
                     await self.steal_failure(ctx)
 
             # Elite Raid v Advanced Security
-            elif targetsave["Active"] == "AS":
-                if targetsave["AS"] == 99:
+            elif targetsave["Active"] == "Advanced Security":
+                if targetsave["Advanced Security"] == 99:
                     success_chance = 33 / 2
                 else:
                     success_chance = 33
@@ -441,44 +491,44 @@ class Steal:
                 else:
                     await self.steal_failure(ctx)
 
-                    if random.randint(1, 100) <= targetsave["AS"]:
+                    if random.randint(1, 100) <= targetsave["Advanced Security"]:
                         bank.deposit_credits(target, 1000)
 
                     # Elite Raid is immune to Advanced Security's cameras
 
-                if playersave["ER"] >= 66:
+                if playersave["Elite Raid"] >= 66:
                     if random.randint(1, 100) <= 33:
-                        if targetsave["AS"] > 5:
-                            targetsave["AS"] -= 5
+                        if targetsave["Advanced Security"] > 5:
+                            targetsave["Advanced Security"] -= 5
                         else:
-                            targetsave["AS"] = 0
+                            targetsave["Advanced Security"] = 0
 
             # Elite Raid v Blackmarket Finances
-            elif targetsave["Active"] == "BF":
+            elif targetsave["Active"] == "Blackmarket Finances":
                 if random.randint(1, 100) <= 66:
                     await self.er_steal(ctx, target)
                 else:
                     await self.steal_failure(ctx)
 
-                if targetsave["BF"] >= 66:
+                if targetsave["Blackmarket Finances"] >= 66:
                     if random.randint(1, 100) <= 33:
-                        if playersave["ER"] > 5:
-                            playersave["ER"] -= 5
+                        if playersave["Elite Raid"] > 5:
+                            playersave["Elite Raid"] -= 5
                         else:
-                            playersave["ER"] = 0
+                            playersave["Elite Raid"] = 0
 
         # ATTACKER: ADVANCED SECURITY
-        elif playersave["Active"] == "AS":
+        elif playersave["Active"] == "Advanced Security":
             # Advanced Security v Elite Raid
-            if targetsave["Active"] == "ER":
+            if targetsave["Active"] == "Elite Raid":
                 if random.randint(1, 100) <= 33:
                     await self.regular_steal(ctx, target)
                 else:
                     await self.steal_failure(ctx)
 
             # Advanced Security v Advanced Security
-            elif targetsave["Active"] == "AS":
-                if targetsave["AS"] == 99:
+            elif targetsave["Active"] == "Advanced Security":
+                if targetsave["Advanced Security"] == 99:
                     success_chance = 33 / 2
                 else:
                     success_chance = 33
@@ -488,31 +538,31 @@ class Steal:
                 else:
                     await self.steal_failure(ctx)
 
-                    if random.randint(1, 100) <= targetsave["AS"]:
+                    if random.randint(1, 100) <= targetsave["Advanced Security"]:
                         bank.deposit_credits(target, 1000)
 
-                    if targetsave["AS"] >= 33:
+                    if targetsave["Advanced Security"] >= 33:
                         await self.reveal_attacker(ctx, target)
 
             # Advanced Security v Blackmarket Finances
-            elif targetsave["Active"] == "BF":
+            elif targetsave["Active"] == "Blackmarket Finances":
                 if random.randint(1, 100) <= 33:
                     await self.regular_steal(ctx, target)
                 else:
                     await self.steal_failure(ctx)
 
         # ATTACKER: BLACKMARKET FINANCES
-        elif playersave["Active"] == "BF":
+        elif playersave["Active"] == "Blackmarket Finances":
             # Blackmarket Finances v Elite Raid
-            if targetsave["Active"] == "ER":
+            if targetsave["Active"] == "Elite Raid":
                 if random.randint(1, 100) <= 50:
                     await self.regular_steal(ctx, target)
                 else:
                     await self.steal_failure(ctx)
 
             # Blackmarket Finances v Advanced Security
-            elif targetsave["Active"] == "AS":
-                if targetsave["AS"] == 99:
+            elif targetsave["Active"] == "Advanced Security":
+                if targetsave["Advanced Security"] == 99:
                     success_chance = 33 / 2
                 else:
                     success_chance = 33
@@ -522,21 +572,21 @@ class Steal:
                 else:
                     await self.steal_failure(ctx)
 
-                    if random.randint(1, 100) <= targetsave["AS"]:
+                    if random.randint(1, 100) <= targetsave["Advanced Security"]:
                         bank.deposit_credits(target, 1000)
 
-                    if targetsave["AS"] >= 33:
+                    if targetsave["Advanced Security"] >= 33:
                         await self.reveal_attacker(ctx, target)
 
-                if targetsave["AS"] >= 66:
+                if targetsave["Advanced Security"] >= 66:
                     if random.randint(1, 100) <= 33:
-                        if playersave["BF"] > 5:
-                            playersave["BF"] -= 5
+                        if playersave["Blackmarket Finances"] > 5:
+                            playersave["Blackmarket Finances"] -= 5
                         else:
-                            playersave["BF"] = 0
+                            playersave["Blackmarket Finances"] = 0
 
             # Blackmarket Finances v Blackmarket Finances
-            elif targetsave["Active"] == "BF":
+            elif targetsave["Active"] == "Blackmarket Finances":
                 if random.randint(1, 100) <= 50:
                     await self.regular_steal(ctx, target)
                 else:
@@ -551,7 +601,7 @@ class Steal:
         playersave = self.save_file["Servers"][server.id]["Players"][player.id]
         bank = self.bot.get_cog("Economy").bank
 
-        if playersave["ER"] == 99:
+        if playersave["Elite Raid"] == 99:
             # 1/10 chance to steal 110% of wealth, if steal successful in the first place
             if random.randint(1, 100) <= 10:
                 amt_stolen = round(bank.get_balance(target) * 1.1)
@@ -570,10 +620,10 @@ class Steal:
 
         amt_stolen = random.randint(1, random.randint(1, 2000))
 
-        if random.randint(1, 100) <= playersave["ER"]:
+        if random.randint(1, 100) <= playersave["Elite Raid"]:
             amt_stolen *= 2
 
-        if playersave["ER"] >= 33:
+        if playersave["Elite Raid"] >= 33:
             # steal a bonus 10% of target's wealth
             amt_stolen += round(bank.get_balance(target) * 0.1)
 
@@ -626,7 +676,7 @@ class Steal:
             "{}, who had {} active, was spotted by your guard "
             "stealing credits from your bank safe! Your guard "
             "was unable to catch the fiend before they fled."
-            .format(player.mention, PRIMARY_UPGRADES[playersave["Active"]])
+            .format(player.mention, playersave["Active"])
         )
         await self.bot.send_message(target, message)
 
@@ -672,9 +722,10 @@ class Steal:
                 server = self.bot.get_server(serverid)
                 for playerid in self.save_file["Servers"][serverid]["Players"]:
                     playersave = self.save_file["Servers"][serverid]["Players"][playerid]
-                    if playersave["Active"] == "BF" and playersave["BF"] > 0:
+                    if (playersave["Active"] == "Blackmarket Finances"
+                            and playersave["Blackmarket Finances"] > 0):
                         player = server.get_member(playerid)
-                        bank.deposit_credits(player, playersave["BF"])
+                        bank.deposit_credits(player, playersave["Blackmarket Finances"])
 
             self.save_file["Global"]["CreditsGivenTime"] = datetime.datetime.utcnow().isoformat()
             dataIO.save_json(SAVE_FILEPATH, self.save_file)
@@ -719,11 +770,38 @@ class Steal:
 
             self.save_file["Global"]["Version"] = "1.1"
 
+        if self.save_file["Global"]["Version"] == "1.1":
+            for serverid in self.save_file["Servers"]:
+                for playerid in self.save_file["Servers"][serverid]["Players"]:
+                    playersave = self.save_file["Servers"][serverid]["Players"][playerid]
+
+                    convert_dict = {
+                        "AS": "Advanced Security",
+                        "ER": "Elite Raid",
+                        "BF": "Blackmarket Finances"
+                    }
+                    playersave["Active"] = convert_dict[playersave["Active"]]
+
+                    for key, value in convert_dict.items():
+                        playersave[value] = playersave[key]
+                        del playersave[key]
+
+            self.save_file["Global"]["Version"] = "1.2"
+
         dataIO.save_json(SAVE_FILEPATH, self.save_file)
 
     def __unload(self):
+        self.unloading = True
         self.loop_task.cancel()
         self.loop_task2.cancel()
+
+def time_left_str(since_time):
+    """Return a string with how much time is left until
+    the 1 hour cooldown is over."""
+    until_available = (60 * 60) - since_time
+    minute, second = divmod(until_available, 60)
+    hour, minute = divmod(minute, 60)
+    return "{:d}:{:02d}:{:02d}".format(hour, minute, second)
 
 def dir_check():
     """Create a folder and save file for the cog if they don't exist."""
