@@ -461,7 +461,7 @@ class Steal:
         if response is None:
             await self.bot.send_message(player, "You failed!")
             if (targetsave["Active"] == "Advanced Security"
-                and random.randint(1, 100) <= targetsave["Advanced Security"]):
+                    and random.randint(1, 100) <= targetsave["Advanced Security"]):
                 bank.deposit_credits(target, 1000)
             return
         else:
@@ -721,7 +721,7 @@ class Steal:
                 for playerid in self.save_file["Servers"][serverid]["Players"]:
                     playersave = self.save_file["Servers"][serverid]["Players"][playerid]
                     if (playersave["Active"] == "Blackmarket Finances"
-                        and playersave["Blackmarket Finances"] > 0):
+                            and playersave["Blackmarket Finances"] > 0):
                         player = server.get_member(playerid)
                         bank.deposit_credits(player, playersave["Blackmarket Finances"])
 
@@ -796,9 +796,9 @@ def time_left_str(since_time):
     """Return a string with how much time is left until
     the 1 hour cooldown is over."""
     until_available = (60 * 60) - since_time
-    m, s = divmod(until_available, 60)
-    h, m = divmod(m, 60)
-    return "{:d}:{:02d}:{:02d}".format(h, m, s)
+    minute, second = divmod(until_available, 60)
+    hour, minute = divmod(minute, 60)
+    return "{:d}:{:02d}:{:02d}".format(hour, minute, second)
 
 def dir_check():
     """Create a folder and save file for the cog if they don't exist."""
