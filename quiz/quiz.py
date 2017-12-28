@@ -179,16 +179,26 @@ class Quiz:
                                                            answerdict[correct_letter])
             await self.bot.send_message(channel, message)
 
+            # Sort player IDs by answer time
+            playerids = sorted(user_answers,
+                               key=lambda playerid: user_answers[playerid]["Time"])
+
             # Assign scores
-            for playerid in user_answers:
+            first = True
+            for playerid in playerids:
                 if user_answers[playerid]["Choice"] == correct_letter:
                     time_taken = user_answers[playerid]["Time"] - start_time
                     assert time_taken > 0
-                    if time_taken < 1:
-                        channelinfo["Players"][playerid] += 1000
-                    else:
-                        # the 20 in the formula below is 2 * 10s (max answer time)
-                        channelinfo["Players"][playerid] += round(1000 * (1 - (time_taken / 20)))
+
+                    # the 20 in the formula below is 2 * 10s (max answer time)
+                    points = round(1000 * (1 - (time_taken / 20)))
+
+                    # The first correct answer gets a bonus 250 points
+                    if first:
+                        points += 250
+                        first = False
+
+                    channelinfo["Players"][playerid] += points
 
             # Display top 5 players and their points
             message = self.scoreboard(channel)
