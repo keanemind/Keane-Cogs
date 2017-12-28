@@ -217,7 +217,7 @@ class Quiz:
         # non-linear credit earning .0002x^{2.9} where x is score/100
         # leaderboard with credits earned
         channelinfo = self.playing_channels[channel.id]
-        idlist = sorted(list(channelinfo["Players"]),
+        idlist = sorted(channelinfo["Players"],
                         key=(lambda idnum: channelinfo["Players"][idnum]),
                         reverse=True)
 
@@ -274,7 +274,7 @@ class Quiz:
         """Returns a scoreboard string to be sent to the text channel."""
         channelinfo = self.playing_channels[channel.id]
         scoreboard = "```py\n"
-        idlist = sorted(list(channelinfo["Players"]),
+        idlist = sorted(channelinfo["Players"],
                         key=(lambda idnum: channelinfo["Players"][idnum]),
                         reverse=True)
         max_score = channelinfo["Players"][idlist[0]]
