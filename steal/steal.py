@@ -5,7 +5,6 @@ import copy
 import random
 import time
 import datetime
-import math
 
 import discord
 from discord.ext import commands
@@ -396,7 +395,7 @@ class Steal:
             if playersave["Blackmarket Finances"] == 99:
                 num *= 2
             num += current_lvl**1.933
-            num = math.log(num, 1.933) - current_lvl
+            num = num**(1/1.933) - current_lvl
             # num is the exact number of levels the user can afford to upgrade
 
             lvls = int(num) # round down
